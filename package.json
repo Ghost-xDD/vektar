@@ -1,0 +1,29 @@
+{
+  "name": "vektar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vektar - Prediction Market Derivative Settlement Infrastructure",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "workflow:simulate": "cd apps/cre-workflow && cre workflow simulate vektar-engine --target local-simulation",
+    "contracts:deploy:polygon": "cd packages/contracts && forge script script/DeployPolygon.s.sol --broadcast",
+    "contracts:deploy:base": "cd packages/contracts && forge script script/DeployBase.s.sol --broadcast"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "bun": ">=1.0.0"
+  },
+  "packageManager": "bun@1.2.14"
+}

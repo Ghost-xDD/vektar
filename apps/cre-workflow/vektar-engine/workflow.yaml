@@ -1,0 +1,7 @@
+specVersion: "1.0.0"
+name: vektar-engine
+owner: ""
+triggers:
+  - type: "cron"
+    schedule: "*/12 * * * * *"
+  - type: "evm-log"

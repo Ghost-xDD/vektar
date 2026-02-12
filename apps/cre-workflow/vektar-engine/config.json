@@ -1,0 +1,27 @@
+{
+  "polygon": {
+    "chainSelectorName": "polygon-testnet-amoy",
+    "isTestnet": true,
+    "escrowAddress": "",
+    "umaOracleAddress": "0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB",
+    "gasLimit": "500000"
+  },
+  "base": {
+    "chainSelectorName": "base-sepolia",
+    "isTestnet": true,
+    "vaultAddress": "",
+    "gasLimit": "1000000"
+  },
+  "polymarket": {
+    "apiUrl": "https://clob.polymarket.com",
+    "cacheMaxAgeMs": 10000
+  },
+  "ltv": {
+    "baseLTV": 0.75,
+    "safetyMargin": 0.9,
+    "maxLTVIncreasePerCycle": 0.02,
+    "liquidationThreshold": 1.0,
+    "twobWindow": 5
+  },
+  "activeMarkets": []
+}

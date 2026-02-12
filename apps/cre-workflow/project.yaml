@@ -1,0 +1,33 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS FILE
+# ==========================================================================
+# Project-specific settings for CRE CLI targets.
+
+local-simulation:
+  rpcs:
+    - chain-name: polygon-testnet-amoy
+      url: ${POLYGON_TESTNET_RPC_URL}
+    - chain-name: base-sepolia
+      url: ${BASE_RPC_URL}
+
+staging:
+  cre-cli:
+    don-family: "zone-a"
+  account:
+    workflow-owner-address: ""  # Multi-sig address (optional)
+  rpcs:
+    - chain-name: polygon-testnet-amoy
+      url: ${POLYGON_TESTNET_RPC_URL}
+    - chain-name: base-sepolia
+      url: ${BASE_RPC_URL}
+
+production:
+  cre-cli:
+    don-family: "zone-a"
+  account:
+    workflow-owner-address: ""  # Multi-sig address (required for mainnet)
+  rpcs:
+    - chain-name: polygon-mainnet
+      url: ${POLYGON_RPC_URL}
+    - chain-name: base-mainnet-1
+      url: ${BASE_RPC_URL}
