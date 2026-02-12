@@ -4,11 +4,11 @@
   "private": true,
   "main": "main.ts",
   "scripts": {
-    "postinstall": "bunx cre-setup"
+    "postinstall": "bunx cre-setup",
+    "cre-compile": "./node_modules/.bin/cre-compile"
   },
   "dependencies": {
-    "@chainlink/cre-sdk": "0.0.8-alpha",
-    "@vektar/core": "workspace:*",
+    "@chainlink/cre-sdk": "^1.0.3",
     "viem": "^2.38.3",
     "zod": "^4.1.12"
   },

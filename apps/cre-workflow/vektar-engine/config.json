@@ -2,14 +2,14 @@
   "polygon": {
     "chainSelectorName": "polygon-testnet-amoy",
     "isTestnet": true,
-    "escrowAddress": "",
+    "escrowAddress": "0x0000000000000000000000000000000000000001",
     "umaOracleAddress": "0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB",
     "gasLimit": "500000"
   },
   "base": {
-    "chainSelectorName": "base-sepolia",
+    "chainSelectorName": "ethereum-testnet-sepolia-base-1",
     "isTestnet": true,
-    "vaultAddress": "",
+    "vaultAddress": "0x0000000000000000000000000000000000000002",
     "gasLimit": "1000000"
   },
   "polymarket": {
@@ -23,5 +23,10 @@
     "liquidationThreshold": 1.0,
     "twobWindow": 5
   },
-  "activeMarkets": []
+  "activeMarkets": [
+    {
+      "tokenId": "21742633143463906290569050155826241533067272736897614950488156847949938836455",
+      "spotPrice": 0.5
+    }
+  ]
 }

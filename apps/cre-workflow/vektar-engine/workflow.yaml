@@ -1,7 +1,28 @@
-specVersion: "1.0.0"
-name: vektar-engine
-owner: ""
-triggers:
-  - type: "cron"
-    schedule: "*/12 * * * * *"
-  - type: "evm-log"
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE
+# ==========================================================================
+# Workflow-specific settings for CRE CLI targets.
+
+local-simulation:
+  user-workflow:
+    workflow-name: "vektar-engine"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.json"
+    secrets-path: "../secrets.yaml"
+
+staging:
+  user-workflow:
+    workflow-name: "vektar-engine"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.json"
+    secrets-path: "../secrets.yaml"
+
+production:
+  user-workflow:
+    workflow-name: "vektar-engine"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.json"
+    secrets-path: "../secrets.yaml"

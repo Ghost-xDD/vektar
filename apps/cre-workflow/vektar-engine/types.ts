@@ -26,7 +26,11 @@ const baseConfigSchema = z.object({
 
 // Polymarket API configuration
 const polymarketConfigSchema = z.object({
-  apiUrl: z.string().url(),
+  // Avoid runtime-specific URL parser differences by validating protocol explicitly.
+  apiUrl: z
+    .string()
+    .min(1)
+    .refine((val) => /^https?:\/\//.test(val), "apiUrl must start with http:// or https://"),
   cacheMaxAgeMs: z.number().int().min(0),
 });
 

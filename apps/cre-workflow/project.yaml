@@ -6,9 +6,9 @@
 local-simulation:
   rpcs:
     - chain-name: polygon-testnet-amoy
-      url: ${POLYGON_TESTNET_RPC_URL}
-    - chain-name: base-sepolia
-      url: ${BASE_RPC_URL}
+      url: https://rpc-amoy.polygon.technology
+    - chain-name: ethereum-testnet-sepolia-base-1
+      url: https://sepolia.base.org
 
 staging:
   cre-cli:

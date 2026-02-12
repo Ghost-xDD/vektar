@@ -1,8 +1,8 @@
 // Entry point for the Vektar CRE workflow - Dynamic LTV Engine
 // Implements dual-handler pattern: Cron (12s monitoring) + Event Log (UMA settlement)
 
-import { cre, type Runtime, Runner, getNetwork, bytesToHex, type EVMLog } from "@chainlink/cre-sdk";
-import { keccak256, toHex, decodeEventLog, parseAbi } from "viem";
+import { cre, Runner, getNetwork, hexToBase64 } from "@chainlink/cre-sdk";
+import { keccak256, toBytes, parseAbi } from "viem";
 import { configSchema, type Config } from "./types";
 
 // Import handlers
@@ -14,9 +14,7 @@ import { settleLoan } from "./handlers/settle-loan";
  **************************************************/
 
 // UMA Optimistic Oracle V3 event on Polygon
-const umaEventAbi = parseAbi([
-  "event AssertionResolved(bytes32 indexed assertionId, address indexed caller, bool result)"
-]);
+parseAbi(["event AssertionResolved(bytes32 indexed assertionId, address indexed caller, bool result)"]);
 
 const assertionResolvedSignature = "AssertionResolved(bytes32,address,bool)";
 
@@ -44,7 +42,7 @@ const assertionResolvedSignature = "AssertionResolved(bytes32,address,bool)";
  */
 const initWorkflow = (config: Config) => {
   // Initialize triggers
-  const cronTrigger = new cre.capabilities.CronTrigger();
+  const cronTrigger = new cre.capabilities.CronCapability();
   
   // Get Polygon network for UMA event monitoring
   const polygonNetwork = getNetwork({
@@ -60,7 +58,7 @@ const initWorkflow = (config: Config) => {
   const polygonEVM = new cre.capabilities.EVMClient(polygonNetwork.chainSelector.selector);
   
   // Compute event topic hash for UMA AssertionResolved
-  const assertionResolvedHash = keccak256(toHex(assertionResolvedSignature));
+  const assertionResolvedHash = keccak256(toBytes(assertionResolvedSignature));
   
   return [
     // Handler 1: Continuous Liquidity Monitoring (every 12 seconds)
@@ -70,14 +68,15 @@ const initWorkflow = (config: Config) => {
     ),
     
     // Handler 2: Event-Driven Settlement (when UMA resolves markets)
-    cre.handler(
-      polygonEVM.logTrigger({
-        addresses: [config.polygon.umaOracleAddress],
-        topics: [{ values: [assertionResolvedHash] }],
-        confidence: "CONFIDENCE_LEVEL_FINALIZED", // Wait for finality
-      }),
-      settleLoan
-    ),
+    // Temporarily disabled for testing
+    // cre.handler(
+    //   polygonEVM.logTrigger({
+    //     addresses: [hexToBase64(config.polygon.umaOracleAddress)],
+    //     topics: [{ values: [hexToBase64(assertionResolvedHash)] }],
+    //     confidence: "CONFIDENCE_LEVEL_FINALIZED", // Wait for finality
+    //   }),
+    //   settleLoan
+    // ),
   ];
 };
 
