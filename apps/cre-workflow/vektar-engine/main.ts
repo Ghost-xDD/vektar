@@ -2,7 +2,7 @@
 // Implements dual-handler pattern: Cron (12s monitoring) + Event Log (UMA settlement)
 
 import { cre, Runner, getNetwork, hexToBase64 } from "@chainlink/cre-sdk";
-import { keccak256, toBytes, parseAbi } from "viem";
+import { keccak256, toBytes } from "viem";
 import { configSchema, type Config } from "./types";
 
 // Import handlers
@@ -12,9 +12,6 @@ import { settleLoan } from "./handlers/settle-loan";
 /**************************************************
  * Event ABI Definitions
  **************************************************/
-
-// UMA Optimistic Oracle V3 event on Polygon
-parseAbi(["event AssertionResolved(bytes32 indexed assertionId, address indexed caller, bool result)"]);
 
 const assertionResolvedSignature = "AssertionResolved(bytes32,address,bool)";
 
