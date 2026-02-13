@@ -49,6 +49,8 @@ const marketConfigSchema = z.object({
   spotPrice: z.number().positive(),
 });
 
+const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address");
+
 // Main workflow configuration schema
 export const configSchema = z.object({
   polygon: polygonConfigSchema,
@@ -56,6 +58,8 @@ export const configSchema = z.object({
   polymarket: polymarketConfigSchema,
   ltv: ltvConfigSchema,
   activeMarkets: z.array(marketConfigSchema).min(1),
+  watchedUsers: z.array(addressSchema),
+  assertionToTokenMap: z.record(z.string(), z.string()).optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -115,6 +119,7 @@ export interface Position {
   collateralAmount: bigint;
   debtAmount: bigint;
   healthFactor: number;
+  liquidatable?: boolean;
 }
 
 /**************************************************

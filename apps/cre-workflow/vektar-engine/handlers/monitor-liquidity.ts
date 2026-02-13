@@ -6,7 +6,8 @@ import type { Config } from "../types";
 import { calculateLiquidityAdjustedLTV } from "../../../../packages/core/ltv-engine/calculate-ltv";
 import { getTimeWeightedLiquidity, calculateTotalBidDepth } from "../../../../packages/core/ltv-engine/twob-tracker";
 import { getTotalLockedCollateral } from "../integrations/collateral-reader";
-import { updateMarketLTV } from "../integrations/ltv-writer";
+import { markLiquidatable, updateMarketLTV } from "../integrations/ltv-writer";
+import { getPosition } from "../integrations/position-reader";
 import { fetchOrderBook } from "../integrations/polymarket";
 
 /**
@@ -79,7 +80,30 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
       const txHash = updateMarketLTV(runtime, market.tokenId, dynamicLtvBps);
       runtime.log(`[MONITOR] updateMarketLTV txHash=${txHash}`);
 
-      // TODO: read active positions + health factors and call markLiquidatable for underwater users.
+      if (runtime.config.watchedUsers.length === 0) {
+        runtime.log("[MONITOR] No watchedUsers configured; skipping liquidation checks");
+        continue;
+      }
+
+      for (const user of runtime.config.watchedUsers) {
+        const pos = getPosition(runtime, user, market.tokenId);
+        if (pos.debtAmount === 0n) {
+          continue;
+        }
+
+        const maxBorrow = (pos.collateralAmount * BigInt(dynamicLtvBps)) / 10000n;
+        const healthBps = maxBorrow === 0n ? 0n : (maxBorrow * 10000n) / pos.debtAmount;
+        const healthFactor = Number(healthBps) / 10000;
+
+        runtime.log(
+          `[MONITOR] user=${user} token=${market.tokenId} debt=${pos.debtAmount} collateral=${pos.collateralAmount} health=${healthFactor.toFixed(4)}`
+        );
+
+        if (healthFactor < runtime.config.ltv.liquidationThreshold && !pos.liquidatable) {
+          const markTx = markLiquidatable(runtime, user, market.tokenId);
+          runtime.log(`[MONITOR] markLiquidatable user=${user} txHash=${markTx}`);
+        }
+      }
     }
     
     runtime.log("[MONITOR] Liquidity monitoring cycle completed");

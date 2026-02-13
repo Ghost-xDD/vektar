@@ -3,7 +3,7 @@
     "chainSelectorName": "polygon-testnet-amoy",
     "isTestnet": true,
     "escrowAddress": "0x0000000000000000000000000000000000000001",
-    "umaOracleAddress": "0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB",
+    "umaOracleAddress": "0xd8866E76441df243fc98B892362Fc6264dC3ca80",
     "gasLimit": "500000"
   },
   "base": {
@@ -28,5 +28,7 @@
       "tokenId": "21742633143463906290569050155826241533067272736897614950488156847949938836455",
       "spotPrice": 0.5
     }
-  ]
+  ],
+  "watchedUsers": [],
+  "assertionToTokenMap": {}
 }

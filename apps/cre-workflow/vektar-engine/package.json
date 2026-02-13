@@ -5,7 +5,8 @@
   "main": "main.ts",
   "scripts": {
     "postinstall": "bunx cre-setup",
-    "cre-compile": "./node_modules/.bin/cre-compile"
+    "cre-compile": "./node_modules/.bin/cre-compile",
+    "find:uma-events": "bun run scripts/find-uma-events.ts"
   },
   "dependencies": {
     "@chainlink/cre-sdk": "^1.0.3",

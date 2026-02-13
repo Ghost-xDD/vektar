@@ -961,9 +961,13 @@ var AbiDecodingZeroDataError;
 var AbiEncodingArrayLengthMismatchError;
 var AbiEncodingBytesSizeMismatchError;
 var AbiEncodingLengthMismatchError;
+var AbiEventSignatureEmptyTopicsError;
+var AbiEventSignatureNotFoundError;
 var AbiFunctionNotFoundError;
 var AbiFunctionOutputsNotFoundError;
 var AbiItemAmbiguityError;
+var DecodeLogDataMismatch;
+var DecodeLogTopicsMismatch;
 var InvalidAbiEncodingTypeError;
 var InvalidAbiDecodingTypeError;
 var InvalidArrayError;
@@ -1037,6 +1041,27 @@ var init_abi = __esm(() => {
 `), { name: "AbiEncodingLengthMismatchError" });
     }
   };
+  AbiEventSignatureEmptyTopicsError = class AbiEventSignatureEmptyTopicsError2 extends BaseError2 {
+    constructor({ docsPath }) {
+      super("Cannot extract event signature from empty topics.", {
+        docsPath,
+        name: "AbiEventSignatureEmptyTopicsError"
+      });
+    }
+  };
+  AbiEventSignatureNotFoundError = class AbiEventSignatureNotFoundError2 extends BaseError2 {
+    constructor(signature, { docsPath }) {
+      super([
+        `Encoded event signature "${signature}" not found on ABI.`,
+        "Make sure you are using the correct ABI and that the event exists on it.",
+        `You can look up the signature here: https://4byte.sourcify.dev/?q=${signature}.`
+      ].join(`
+`), {
+        docsPath,
+        name: "AbiEventSignatureNotFoundError"
+      });
+    }
+  };
   AbiFunctionNotFoundError = class AbiFunctionNotFoundError2 extends BaseError2 {
     constructor(functionName, { docsPath } = {}) {
       super([
@@ -1074,6 +1099,63 @@ var init_abi = __esm(() => {
         ],
         name: "AbiItemAmbiguityError"
       });
+    }
+  };
+  DecodeLogDataMismatch = class DecodeLogDataMismatch2 extends BaseError2 {
+    constructor({ abiItem, data, params, size: size2 }) {
+      super([
+        `Data size of ${size2} bytes is too small for non-indexed event parameters.`
+      ].join(`
+`), {
+        metaMessages: [
+          `Params: (${formatAbiParams(params, { includeName: true })})`,
+          `Data:   ${data} (${size2} bytes)`
+        ],
+        name: "DecodeLogDataMismatch"
+      });
+      Object.defineProperty(this, "abiItem", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "data", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "params", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      Object.defineProperty(this, "size", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      this.abiItem = abiItem;
+      this.data = data;
+      this.params = params;
+      this.size = size2;
+    }
+  };
+  DecodeLogTopicsMismatch = class DecodeLogTopicsMismatch2 extends BaseError2 {
+    constructor({ abiItem, param }) {
+      super([
+        `Expected a topic for indexed event parameter${param.name ? ` "${param.name}"` : ""} on event "${formatAbiItem2(abiItem, { includeName: true })}".`
+      ].join(`
+`), { name: "DecodeLogTopicsMismatch" });
+      Object.defineProperty(this, "abiItem", {
+        enumerable: true,
+        configurable: true,
+        writable: true,
+        value: undefined
+      });
+      this.abiItem = abiItem;
     }
   };
   InvalidAbiEncodingTypeError = class InvalidAbiEncodingTypeError2 extends BaseError2 {
@@ -2751,13 +2833,13 @@ function decodeFunctionResult(parameters) {
   if (functionName) {
     const item = getAbiItem({ abi, args, name: functionName });
     if (!item)
-      throw new AbiFunctionNotFoundError(functionName, { docsPath: docsPath2 });
+      throw new AbiFunctionNotFoundError(functionName, { docsPath: docsPath3 });
     abiItem = item;
   }
   if (abiItem.type !== "function")
-    throw new AbiFunctionNotFoundError(undefined, { docsPath: docsPath2 });
+    throw new AbiFunctionNotFoundError(undefined, { docsPath: docsPath3 });
   if (!abiItem.outputs)
-    throw new AbiFunctionOutputsNotFoundError(abiItem.name, { docsPath: docsPath2 });
+    throw new AbiFunctionOutputsNotFoundError(abiItem.name, { docsPath: docsPath3 });
   const values = decodeAbiParameters(abiItem.outputs, data);
   if (values && values.length > 1)
     return values;
@@ -2765,7 +2847,7 @@ function decodeFunctionResult(parameters) {
     return values[0];
   return;
 }
-var docsPath2 = "/docs/contract/decodeFunctionResult";
+var docsPath3 = "/docs/contract/decodeFunctionResult";
 var init_decodeFunctionResult = __esm(() => {
   init_abi();
   init_decodeAbiParameters();
@@ -16980,6 +17062,97 @@ var sendErrorResponse = (error) => {
   hostBindings.sendResponse(payload);
 };
 init_exports();
+init_abi();
+init_cursor();
+init_size();
+init_toEventSelector();
+init_decodeAbiParameters();
+init_formatAbiItem2();
+var docsPath2 = "/docs/contract/decodeEventLog";
+function decodeEventLog(parameters) {
+  const { abi, data, strict: strict_, topics } = parameters;
+  const strict = strict_ ?? true;
+  const [signature, ...argTopics] = topics;
+  if (!signature)
+    throw new AbiEventSignatureEmptyTopicsError({ docsPath: docsPath2 });
+  const abiItem = abi.find((x) => x.type === "event" && signature === toEventSelector(formatAbiItem2(x)));
+  if (!(abiItem && ("name" in abiItem)) || abiItem.type !== "event")
+    throw new AbiEventSignatureNotFoundError(signature, { docsPath: docsPath2 });
+  const { name, inputs } = abiItem;
+  const isUnnamed = inputs?.some((x) => !(("name" in x) && x.name));
+  const args = isUnnamed ? [] : {};
+  const indexedInputs = inputs.map((x, i2) => [x, i2]).filter(([x]) => ("indexed" in x) && x.indexed);
+  const missingIndexedInputs = [];
+  for (let i2 = 0;i2 < indexedInputs.length; i2++) {
+    const [param, argIndex] = indexedInputs[i2];
+    const topic = argTopics[i2];
+    if (!topic) {
+      if (strict)
+        throw new DecodeLogTopicsMismatch({
+          abiItem,
+          param
+        });
+      missingIndexedInputs.push([param, argIndex]);
+      continue;
+    }
+    args[isUnnamed ? argIndex : param.name || argIndex] = decodeTopic({
+      param,
+      value: topic
+    });
+  }
+  const nonIndexedInputs = inputs.filter((x) => !(("indexed" in x) && x.indexed));
+  const inputsToDecode = strict ? nonIndexedInputs : [...missingIndexedInputs.map(([param]) => param), ...nonIndexedInputs];
+  if (inputsToDecode.length > 0) {
+    if (data && data !== "0x") {
+      try {
+        const decodedData = decodeAbiParameters(inputsToDecode, data);
+        if (decodedData) {
+          let dataIndex = 0;
+          if (!strict) {
+            for (const [param, argIndex] of missingIndexedInputs) {
+              args[isUnnamed ? argIndex : param.name || argIndex] = decodedData[dataIndex++];
+            }
+          }
+          if (isUnnamed) {
+            for (let i2 = 0;i2 < inputs.length; i2++)
+              if (args[i2] === undefined && dataIndex < decodedData.length)
+                args[i2] = decodedData[dataIndex++];
+          } else
+            for (let i2 = 0;i2 < nonIndexedInputs.length; i2++)
+              args[nonIndexedInputs[i2].name] = decodedData[dataIndex++];
+        }
+      } catch (err) {
+        if (strict) {
+          if (err instanceof AbiDecodingDataSizeTooSmallError || err instanceof PositionOutOfBoundsError)
+            throw new DecodeLogDataMismatch({
+              abiItem,
+              data,
+              params: inputsToDecode,
+              size: size(data)
+            });
+          throw err;
+        }
+      }
+    } else if (strict) {
+      throw new DecodeLogDataMismatch({
+        abiItem,
+        data: "0x",
+        params: inputsToDecode,
+        size: 0
+      });
+    }
+  }
+  return {
+    eventName: name,
+    args: Object.values(args).length > 0 ? args : undefined
+  };
+}
+function decodeTopic({ param, value: value2 }) {
+  if (param.type === "string" || param.type === "bytes" || param.type === "tuple" || param.type.match(/^(.*)\[(\d+)?\]$/))
+    return value2;
+  const decodedArg = decodeAbiParameters([param], value2) || [];
+  return decodedArg[0];
+}
 init_decodeFunctionResult();
 init_encodeAbiParameters();
 init_encodeFunctionData();
@@ -30453,12 +30626,15 @@ var marketConfigSchema = exports_external2.object({
   tokenId: exports_external2.string(),
   spotPrice: exports_external2.number().positive()
 });
+var addressSchema = exports_external2.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address");
 var configSchema = exports_external2.object({
   polygon: polygonConfigSchema,
   base: baseConfigSchema,
   polymarket: polymarketConfigSchema,
   ltv: ltvConfigSchema,
-  activeMarkets: exports_external2.array(marketConfigSchema).min(1)
+  activeMarkets: exports_external2.array(marketConfigSchema).min(1),
+  watchedUsers: exports_external2.array(addressSchema),
+  assertionToTokenMap: exports_external2.record(exports_external2.string(), exports_external2.string()).optional()
 });
 function calculateLiquidityAdjustedLTV(orderBook, collateralSize, spotPrice, config2) {
   let remainingSize = Number(collateralSize);
@@ -30601,6 +30777,88 @@ var updateMarketLTV = (runtime2, tokenId, newLTVBps) => {
   }
   return txHash;
 };
+var markLiquidatable = (runtime2, user, tokenId) => {
+  const vaultAddress = runtime2.config.base.vaultAddress;
+  if (isPlaceholderAddress2(vaultAddress)) {
+    runtime2.log("[LTV] Placeholder vault address configured; skipping markLiquidatable write");
+    return "0x";
+  }
+  const reportData = encodeAbiParameters(parseAbiParameters("address user, uint256 tokenId"), [
+    user,
+    BigInt(tokenId)
+  ]);
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(reportData),
+    encoderName: "evm",
+    signingAlgo: "ecdsa",
+    hashingAlgo: "keccak256"
+  }).result();
+  const evmClient = getBaseClient(runtime2);
+  const writeResult = evmClient.writeReport(runtime2, {
+    receiver: vaultAddress,
+    report: report2,
+    gasConfig: {
+      gasLimit: runtime2.config.base.gasLimit
+    }
+  }).result();
+  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
+  if (writeResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`markLiquidatable write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
+  }
+  return txHash;
+};
+var vaultAbi = parseAbi([
+  "function positions(address user, uint256 tokenId) view returns (uint256 tokenIdValue, uint256 collateralAmount, uint256 debtAmount, uint256 lastLTVUpdate, bool liquidatable, uint256 liquidatableTimestamp, address polygonAddress)",
+  "function markets(uint256 tokenId) view returns (uint256 currentLTV, uint256 lastUpdate, uint256 totalCollateral, bool active)",
+  "function getActiveMarkets() view returns (uint256[])"
+]);
+var isPlaceholderAddress3 = (address) => {
+  try {
+    return BigInt(address) <= 0x1000n;
+  } catch {
+    return false;
+  }
+};
+var getBaseClient2 = (runtime2) => {
+  const network248 = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: runtime2.config.base.chainSelectorName,
+    isTestnet: runtime2.config.base.isTestnet || false
+  });
+  if (!network248) {
+    throw new Error(`Base network not found: ${runtime2.config.base.chainSelectorName}`);
+  }
+  return new cre.capabilities.EVMClient(network248.chainSelector.selector);
+};
+var getPosition = (runtime2, user, tokenId) => {
+  const vaultAddress = runtime2.config.base.vaultAddress;
+  if (isPlaceholderAddress3(vaultAddress)) {
+    return { tokenIdValue: 0n, collateralAmount: 0n, debtAmount: 0n, liquidatable: false };
+  }
+  const callData = encodeFunctionData({
+    abi: vaultAbi,
+    functionName: "positions",
+    args: [user, BigInt(tokenId)]
+  });
+  const evmClient = getBaseClient2(runtime2);
+  const result = evmClient.callContract(runtime2, {
+    call: {
+      to: hexToBase64(vaultAddress),
+      data: hexToBase64(callData)
+    }
+  }).result();
+  const decoded = decodeFunctionResult({
+    abi: vaultAbi,
+    functionName: "positions",
+    data: bytesToHex(result.data)
+  });
+  return {
+    tokenIdValue: decoded[0],
+    collateralAmount: decoded[1],
+    debtAmount: decoded[2],
+    liquidatable: decoded[4]
+  };
+};
 var buildBookRequest = (apiUrl, tokenId) => (sendRequester) => {
   const req = {
     url: `${apiUrl.replace(/\/$/, "")}/book?token_id=${encodeURIComponent(tokenId)}`,
@@ -30672,6 +30930,24 @@ var monitorLiquidity = async (runtime2) => {
       runtime2.log(`[MONITOR] LTV calc token=${market.tokenId} dynamic=${dynamicLtvBps}bps vwap=${ltvResult.vwap} slippage=${ltvResult.slippageFactor}`);
       const txHash = updateMarketLTV(runtime2, market.tokenId, dynamicLtvBps);
       runtime2.log(`[MONITOR] updateMarketLTV txHash=${txHash}`);
+      if (runtime2.config.watchedUsers.length === 0) {
+        runtime2.log("[MONITOR] No watchedUsers configured; skipping liquidation checks");
+        continue;
+      }
+      for (const user of runtime2.config.watchedUsers) {
+        const pos = getPosition(runtime2, user, market.tokenId);
+        if (pos.debtAmount === 0n) {
+          continue;
+        }
+        const maxBorrow = pos.collateralAmount * BigInt(dynamicLtvBps) / 10000n;
+        const healthBps = maxBorrow === 0n ? 0n : maxBorrow * 10000n / pos.debtAmount;
+        const healthFactor = Number(healthBps) / 1e4;
+        runtime2.log(`[MONITOR] user=${user} token=${market.tokenId} debt=${pos.debtAmount} collateral=${pos.collateralAmount} health=${healthFactor.toFixed(4)}`);
+        if (healthFactor < runtime2.config.ltv.liquidationThreshold && !pos.liquidatable) {
+          const markTx = markLiquidatable(runtime2, user, market.tokenId);
+          runtime2.log(`[MONITOR] markLiquidatable user=${user} txHash=${markTx}`);
+        }
+      }
     }
     runtime2.log("[MONITOR] Liquidity monitoring cycle completed");
     return "Liquidity monitoring complete";
@@ -30681,7 +30957,129 @@ var monitorLiquidity = async (runtime2) => {
     throw err;
   }
 };
-var assertionResolvedSignature = "AssertionResolved(bytes32,address,bool)";
+var isPlaceholderAddress4 = (address) => {
+  try {
+    return BigInt(address) <= 0x1000n;
+  } catch {
+    return false;
+  }
+};
+var getClient = (runtime2, chainSelectorName, isTestnet) => {
+  const network248 = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName,
+    isTestnet: isTestnet || false
+  });
+  if (!network248) {
+    throw new Error(`Network not found: ${chainSelectorName}`);
+  }
+  return new cre.capabilities.EVMClient(network248.chainSelector.selector);
+};
+var settleLoanOnBase = (runtime2, user, tokenId, outcome, netSettlement) => {
+  const vaultAddress = runtime2.config.base.vaultAddress;
+  if (isPlaceholderAddress4(vaultAddress)) {
+    runtime2.log("[SETTLEMENT] Placeholder vault address configured; skipping settleLoan write");
+    return "0x";
+  }
+  const reportData = encodeAbiParameters(parseAbiParameters("address user, uint256 tokenId, uint8 outcome, int256 netSettlement"), [user, BigInt(tokenId), outcome, netSettlement]);
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(reportData),
+    encoderName: "evm",
+    signingAlgo: "ecdsa",
+    hashingAlgo: "keccak256"
+  }).result();
+  const evmClient = getClient(runtime2, runtime2.config.base.chainSelectorName, runtime2.config.base.isTestnet);
+  const writeResult = evmClient.writeReport(runtime2, {
+    receiver: vaultAddress,
+    report: report2,
+    gasConfig: {
+      gasLimit: runtime2.config.base.gasLimit
+    }
+  }).result();
+  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
+  if (writeResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`settleLoanOnBase write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
+  }
+  return txHash;
+};
+var releaseCollateralOnPolygon = (runtime2, user, tokenId, outcome) => {
+  const escrowAddress = runtime2.config.polygon.escrowAddress;
+  if (isPlaceholderAddress4(escrowAddress)) {
+    runtime2.log("[SETTLEMENT] Placeholder escrow address configured; skipping releaseOnSettlement write");
+    return "0x";
+  }
+  const reportData = encodeAbiParameters(parseAbiParameters("address user, uint256 tokenId, uint8 outcome"), [
+    user,
+    BigInt(tokenId),
+    outcome
+  ]);
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(reportData),
+    encoderName: "evm",
+    signingAlgo: "ecdsa",
+    hashingAlgo: "keccak256"
+  }).result();
+  const evmClient = getClient(runtime2, runtime2.config.polygon.chainSelectorName, runtime2.config.polygon.isTestnet);
+  const writeResult = evmClient.writeReport(runtime2, {
+    receiver: escrowAddress,
+    report: report2,
+    gasConfig: {
+      gasLimit: runtime2.config.polygon.gasLimit
+    }
+  }).result();
+  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
+  if (writeResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`releaseCollateralOnPolygon write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
+  }
+  return txHash;
+};
+var umaEventAbi = parseAbi([
+  "event AssertionSettled(bytes32 indexed assertionId, address indexed assertionCaller, bool settlementResolution, bool assertedTruthfully, address settleCaller)"
+]);
+var settleLoan = (runtime2, log) => {
+  try {
+    runtime2.log("[SETTLEMENT] Market resolution detected");
+    const topics = log.topics.map((t) => bytesToHex(t));
+    const data = bytesToHex(log.data);
+    const decoded = decodeEventLog({
+      abi: umaEventAbi,
+      data,
+      topics
+    });
+    const assertionId = decoded.args.assertionId;
+    const settlementResolution = decoded.args.settlementResolution;
+    const outcome = settlementResolution ? 1 : 0;
+    runtime2.log(`[SETTLEMENT] AssertionId: ${assertionId}`);
+    runtime2.log(`[SETTLEMENT] SettlementResolution: ${outcome === 1 ? "YES" : "NO"}`);
+    const mappedTokenId = runtime2.config.assertionToTokenMap?.[assertionId.toLowerCase()] ?? runtime2.config.activeMarkets[0]?.tokenId;
+    if (!mappedTokenId) {
+      throw new Error("No tokenId found for settlement (assertion map empty and no active market configured)");
+    }
+    runtime2.log(`[SETTLEMENT] Using tokenId=${mappedTokenId}`);
+    if (runtime2.config.watchedUsers.length === 0) {
+      runtime2.log("[SETTLEMENT] No watchedUsers configured; nothing to settle");
+      return "Settlement complete (no users)";
+    }
+    for (const user of runtime2.config.watchedUsers) {
+      const pos = getPosition(runtime2, user, mappedTokenId);
+      if (pos.debtAmount === 0n && pos.collateralAmount === 0n) {
+        continue;
+      }
+      const netSettlement = outcome === 1 ? pos.collateralAmount - pos.debtAmount : -pos.debtAmount;
+      const baseTx = settleLoanOnBase(runtime2, user, mappedTokenId, outcome, netSettlement);
+      runtime2.log(`[SETTLEMENT] settleLoanOnBase user=${user} txHash=${baseTx}`);
+      const polygonTx = releaseCollateralOnPolygon(runtime2, user, mappedTokenId, outcome);
+      runtime2.log(`[SETTLEMENT] releaseCollateralOnPolygon user=${user} txHash=${polygonTx}`);
+    }
+    runtime2.log("[SETTLEMENT] Settlement processing complete");
+    return "Settlement complete";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    runtime2.log(`[ERROR] settleLoan: ${msg}`);
+    throw err;
+  }
+};
+var assertionSettledSignature = "AssertionSettled(bytes32,address,bool,bool,address)";
 var initWorkflow = (config2) => {
   const cronTrigger = new cre.capabilities.CronCapability;
   const polygonNetwork = getNetwork({
@@ -30693,9 +31091,14 @@ var initWorkflow = (config2) => {
     throw new Error(`Polygon network not found: ${config2.polygon.chainSelectorName}`);
   }
   const polygonEVM = new cre.capabilities.EVMClient(polygonNetwork.chainSelector.selector);
-  const assertionResolvedHash = keccak256(toBytes(assertionResolvedSignature));
+  const assertionSettledHash = keccak256(toBytes(assertionSettledSignature));
   return [
-    cre.handler(cronTrigger.trigger({ schedule: "*/12 * * * * *" }), monitorLiquidity)
+    cre.handler(cronTrigger.trigger({ schedule: "*/12 * * * * *" }), monitorLiquidity),
+    cre.handler(polygonEVM.logTrigger({
+      addresses: [hexToBase64(config2.polygon.umaOracleAddress)],
+      topics: [{ values: [hexToBase64(assertionSettledHash)] }],
+      confidence: "CONFIDENCE_LEVEL_FINALIZED"
+    }), settleLoan)
   ];
 };
 async function main() {

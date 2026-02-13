@@ -5,13 +5,15 @@
 import { type Runtime, type EVMLog, bytesToHex } from "@chainlink/cre-sdk";
 import { decodeEventLog, parseAbi } from "viem";
 import type { Config } from "../types";
+import { getPosition } from "../integrations/position-reader";
+import { releaseCollateralOnPolygon, settleLoanOnBase } from "../integrations/settlement-writer";
 
 const umaEventAbi = parseAbi([
-  "event AssertionResolved(bytes32 indexed assertionId, address indexed caller, bool result)"
+  "event AssertionSettled(bytes32 indexed assertionId, address indexed assertionCaller, bool settlementResolution, bool assertedTruthfully, address settleCaller)"
 ]);
 
 /**
- * Settlement handler - triggered by UMA AssertionResolved event
+ * Settlement handler - triggered by UMA AssertionSettled event
  * 
  * Flow:
  * 1. Decode UMA oracle event (assertionId, outcome)
@@ -22,7 +24,7 @@ const umaEventAbi = parseAbi([
  * 6. Release collateral from Polygon escrow
  * 
  * @param runtime - CRE runtime instance with config and secrets
- * @param log - EVM log containing the AssertionResolved event
+ * @param log - EVM log containing the AssertionSettled event
  * @returns Success message
  */
 export const settleLoan = (runtime: Runtime<Config>, log: EVMLog): string => {
@@ -40,18 +42,40 @@ export const settleLoan = (runtime: Runtime<Config>, log: EVMLog): string => {
     });
     
     const assertionId = decoded.args.assertionId as `0x${string}`;
-    const result = decoded.args.result as boolean;
-    const outcome = result ? 1 : 0; // true = YES wins, false = NO wins
+    const settlementResolution = decoded.args.settlementResolution as boolean;
+    const outcome = settlementResolution ? 1 : 0; // true = YES wins, false = NO wins
     
     runtime.log(`[SETTLEMENT] AssertionId: ${assertionId}`);
-    runtime.log(`[SETTLEMENT] Outcome: ${outcome === 1 ? "YES" : "NO"}`);
-    
-    // TODO: Implement full settlement logic
-    // 1. Map assertionId to tokenId
-    // 2. getActivePositions(runtime, tokenId)
-    // 3. calculateSettlement(positions, outcome)
-    // 4. executeSettlementOnBase(runtime, settlements)
-    // 5. releaseCollateralOnPolygon(runtime, positions)
+    runtime.log(`[SETTLEMENT] SettlementResolution: ${outcome === 1 ? "YES" : "NO"}`);
+
+    const mappedTokenId =
+      runtime.config.assertionToTokenMap?.[assertionId.toLowerCase()] ?? runtime.config.activeMarkets[0]?.tokenId;
+    if (!mappedTokenId) {
+      throw new Error("No tokenId found for settlement (assertion map empty and no active market configured)");
+    }
+    runtime.log(`[SETTLEMENT] Using tokenId=${mappedTokenId}`);
+
+    if (runtime.config.watchedUsers.length === 0) {
+      runtime.log("[SETTLEMENT] No watchedUsers configured; nothing to settle");
+      return "Settlement complete (no users)";
+    }
+
+    for (const user of runtime.config.watchedUsers) {
+      const pos = getPosition(runtime, user, mappedTokenId);
+      if (pos.debtAmount === 0n && pos.collateralAmount === 0n) {
+        continue;
+      }
+
+      // Simple net settlement baseline:
+      // YES: collateral value offsets debt; NO: debt is treated as loss.
+      const netSettlement = outcome === 1 ? pos.collateralAmount - pos.debtAmount : -pos.debtAmount;
+
+      const baseTx = settleLoanOnBase(runtime, user, mappedTokenId, outcome, netSettlement);
+      runtime.log(`[SETTLEMENT] settleLoanOnBase user=${user} txHash=${baseTx}`);
+
+      const polygonTx = releaseCollateralOnPolygon(runtime, user, mappedTokenId, outcome);
+      runtime.log(`[SETTLEMENT] releaseCollateralOnPolygon user=${user} txHash=${polygonTx}`);
+    }
     
     runtime.log("[SETTLEMENT] Settlement processing complete");
     return "Settlement complete";

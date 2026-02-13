@@ -13,7 +13,7 @@ import { settleLoan } from "./handlers/settle-loan";
  * Event ABI Definitions
  **************************************************/
 
-const assertionResolvedSignature = "AssertionResolved(bytes32,address,bool)";
+const assertionSettledSignature = "AssertionSettled(bytes32,address,bool,bool,address)";
 
 /**************************************************
  * Workflow Initialization
@@ -30,7 +30,7 @@ const assertionResolvedSignature = "AssertionResolved(bytes32,address,bool)";
  * 
  * Handler 2: EVM Log trigger (event-driven)
  *  - Watches UMA Optimistic Oracle on Polygon
- *  - Triggers when markets resolve (AssertionResolved event)
+ *  - Triggers when markets settle (AssertionSettled event)
  *  - Executes final settlement across chains
  *  - Releases collateral from Polygon escrow
  * 
@@ -54,8 +54,8 @@ const initWorkflow = (config: Config) => {
   
   const polygonEVM = new cre.capabilities.EVMClient(polygonNetwork.chainSelector.selector);
   
-  // Compute event topic hash for UMA AssertionResolved
-  const assertionResolvedHash = keccak256(toBytes(assertionResolvedSignature));
+  // Compute event topic hash for UMA AssertionSettled
+  const assertionSettledHash = keccak256(toBytes(assertionSettledSignature));
   
   return [
     // Handler 1: Continuous Liquidity Monitoring (every 12 seconds)
@@ -65,15 +65,14 @@ const initWorkflow = (config: Config) => {
     ),
     
     // Handler 2: Event-Driven Settlement (when UMA resolves markets)
-    // Temporarily disabled for testing
-    // cre.handler(
-    //   polygonEVM.logTrigger({
-    //     addresses: [hexToBase64(config.polygon.umaOracleAddress)],
-    //     topics: [{ values: [hexToBase64(assertionResolvedHash)] }],
-    //     confidence: "CONFIDENCE_LEVEL_FINALIZED", // Wait for finality
-    //   }),
-    //   settleLoan
-    // ),
+    cre.handler(
+      polygonEVM.logTrigger({
+        addresses: [hexToBase64(config.polygon.umaOracleAddress)],
+        topics: [{ values: [hexToBase64(assertionSettledHash)] }],
+        confidence: "CONFIDENCE_LEVEL_FINALIZED", // Wait for finality
+      }),
+      settleLoan
+    ),
   ];
 };
 
