@@ -47,6 +47,7 @@ const ltvConfigSchema = z.object({
 // Active market configuration
 const marketConfigSchema = z.object({
   tokenId: z.string(),
+  noTokenId: z.string().optional(),
   spotPrice: z.number().positive(),
 });
 

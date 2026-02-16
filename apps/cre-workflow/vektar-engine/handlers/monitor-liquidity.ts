@@ -8,7 +8,7 @@ import { getTimeWeightedLiquidity, calculateTotalBidDepth } from "../../../../pa
 import { getTotalLockedCollateral } from "../integrations/collateral-reader";
 import { markLiquidatable, updateMarketLTV } from "../integrations/ltv-writer";
 import { getPosition } from "../integrations/position-reader";
-import { fetchOrderBook } from "../integrations/polymarket";
+import { fetchMergedOrderBook } from "../integrations/polymarket";
 
 /**
  * Monitor liquidity handler - runs every 12 seconds via cron trigger
@@ -45,8 +45,7 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
       runtime.log(`[MONITOR] Processing market: ${shortToken}`);
       runtime.log(`[HTTP]    Fetching Polymarket order book...`);
 
-      const orderBook = fetchOrderBook(runtime, market.tokenId);
-      runtime.log(`[CONSENSUS] ✓ Order book data retrieved (${orderBook.bids.length} bids)`);
+      const orderBook = fetchMergedOrderBook(runtime, market.tokenId, market.noTokenId);
       const totalBidDepth = calculateTotalBidDepth(orderBook.bids);
       const twobLiquidity = getTimeWeightedLiquidity(
         market.tokenId,
