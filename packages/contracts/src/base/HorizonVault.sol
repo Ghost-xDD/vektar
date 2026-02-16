@@ -5,6 +5,9 @@ pragma solidity ^0.8.24;
 /// @notice Tracks user positions, manages Dynamic LTV, and handles liquidations
 /// @dev Deployed on Base. Updated by CRE DON with real-time liquidity data from Polymarket
 contract HorizonVault {
+    /// @notice Function selectors for routing
+    bytes4 private constant UPDATE_MARKET_LTV_SELECTOR = 0x2442fe4a; // updateMarketLTV(uint256,uint256,bytes)
+    bytes4 private constant MARK_LIQUIDATABLE_SELECTOR = 0x9c26443c; // markLiquidatable(address,uint256,bytes)
     /// @notice CRE forwarder address - only this can update LTV and mark liquidations
     address public immutable CRE_FORWARDER;
     
@@ -98,15 +101,34 @@ contract HorizonVault {
         _;
     }
     
+    /// @notice Entry point for Chainlink Forwarder - routes reports to appropriate function
+    /// @param metadata Workflow metadata (unused)
+    /// @param report ABI-encoded function selector + parameters
+    function onReport(bytes calldata metadata, bytes calldata report) external onlyCREForwarder {
+        bytes4 selector = bytes4(report[0:4]);
+        
+        if (selector == UPDATE_MARKET_LTV_SELECTOR) {
+            // Decode: selector + uint256 tokenId + uint256 newLTV + bytes proof
+            (uint256 tokenId, uint256 newLTV, bytes memory proof) = abi.decode(report[4:], (uint256, uint256, bytes));
+            _updateMarketLTV(tokenId, newLTV, proof);
+        } else if (selector == MARK_LIQUIDATABLE_SELECTOR) {
+            // Decode: selector + address user + uint256 tokenId + bytes proof
+            (address user, uint256 tokenId, bytes memory proof) = abi.decode(report[4:], (address, uint256, bytes));
+            _markLiquidatable(user, tokenId, proof);
+        } else {
+            revert("Unknown function selector");
+        }
+    }
+    
     /// @notice Update market-level LTV (called by CRE every 12s)
     /// @param tokenId The Polymarket token ID
     /// @param newLTV New LTV in basis points (0-10000)
     /// @param proof Cryptographic proof from CRE DON
-    function updateMarketLTV(
+    function _updateMarketLTV(
         uint256 tokenId,
         uint256 newLTV,
-        bytes calldata proof
-    ) external onlyCREForwarder {
+        bytes memory proof
+    ) internal {
         MarketData storage market = markets[tokenId];
         uint256 currentLTV = market.currentLTV;
         
@@ -135,11 +157,11 @@ contract HorizonVault {
     /// @param user The user address
     /// @param tokenId The token ID
     /// @param proof Cryptographic proof from CRE DON
-    function markLiquidatable(
+    function _markLiquidatable(
         address user,
         uint256 tokenId,
-        bytes calldata proof
-    ) external onlyCREForwarder {
+        bytes memory proof
+    ) internal {
         Position storage pos = positions[user][tokenId];
         
         if (!pos.liquidatable) {

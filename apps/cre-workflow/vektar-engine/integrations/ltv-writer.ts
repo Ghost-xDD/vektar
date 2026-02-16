@@ -1,5 +1,5 @@
 import { bytesToHex, cre, getNetwork, hexToBase64, TxStatus, type Runtime } from "@chainlink/cre-sdk";
-import { encodeAbiParameters, parseAbiParameters } from "viem";
+import { encodeFunctionData, parseAbi } from "viem";
 import type { Config } from "../types";
 
 const isPlaceholderAddress = (address: string): boolean => {
@@ -29,10 +29,11 @@ export const updateMarketLTV = (runtime: Runtime<Config>, tokenId: string, newLT
     return "0x";
   }
 
-  const reportData = encodeAbiParameters(parseAbiParameters("uint256 tokenId, uint256 newLTV"), [
-    BigInt(tokenId),
-    BigInt(newLTVBps),
-  ]);
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function updateMarketLTV(uint256 tokenId, uint256 newLTV, bytes proof)"]),
+    functionName: "updateMarketLTV",
+    args: [BigInt(tokenId), BigInt(newLTVBps), "0x"],
+  });
 
   const report = runtime
     .report({
@@ -68,10 +69,11 @@ export const markLiquidatable = (runtime: Runtime<Config>, user: string, tokenId
     return "0x";
   }
 
-  const reportData = encodeAbiParameters(parseAbiParameters("address user, uint256 tokenId"), [
-    user as `0x${string}`,
-    BigInt(tokenId),
-  ]);
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function markLiquidatable(address user, uint256 tokenId, bytes proof)"]),
+    functionName: "markLiquidatable",
+    args: [user as `0x${string}`, BigInt(tokenId), "0x"],
+  });
 
   const report = runtime
     .report({
