@@ -13,6 +13,7 @@ const polygonConfigSchema = z.object({
   isTestnet: z.boolean().optional(),
   escrowAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address"),
   umaOracleAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address"),
+  umaCtfAdapterAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address"),
   gasLimit: z.string().regex(/^\d+$/).refine(val => Number(val) > 0),
 });
 

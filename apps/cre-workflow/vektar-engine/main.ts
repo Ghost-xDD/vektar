@@ -13,7 +13,8 @@ import { settleLoan } from "./handlers/settle-loan";
  * Event ABI Definitions
  **************************************************/
 
-const assertionSettledSignature = "AssertionSettled(bytes32,address,bool,bool,address)";
+// UMA CTF Adapter event (Polymarket integration)
+const questionResolvedSignature = "QuestionResolved(bytes32,int256,uint256[])";
 
 /**************************************************
  * Workflow Initialization
@@ -54,8 +55,8 @@ const initWorkflow = (config: Config) => {
   
   const polygonEVM = new cre.capabilities.EVMClient(polygonNetwork.chainSelector.selector);
   
-  // Compute event topic hash for UMA AssertionSettled
-  const assertionSettledHash = keccak256(toBytes(assertionSettledSignature));
+  // Compute event topic hash for UMA CTF Adapter QuestionResolved
+  const questionResolvedHash = keccak256(toBytes(questionResolvedSignature));
   
   return [
     // Handler 1: Continuous Liquidity Monitoring (every 12 seconds)
@@ -64,11 +65,11 @@ const initWorkflow = (config: Config) => {
       monitorLiquidity
     ),
     
-    // Handler 2: Event-Driven Settlement (when UMA resolves markets)
+    // Handler 2: Event-Driven Settlement (when Polymarket markets resolve via UMA)
     cre.handler(
       polygonEVM.logTrigger({
-        addresses: [hexToBase64(config.polygon.umaOracleAddress)],
-        topics: [{ values: [hexToBase64(assertionSettledHash)] }],
+        addresses: [hexToBase64(config.polygon.umaCtfAdapterAddress)],
+        topics: [{ values: [hexToBase64(questionResolvedHash)] }],
         confidence: "CONFIDENCE_LEVEL_FINALIZED", // Wait for finality
       }),
       settleLoan
