@@ -9,22 +9,22 @@ import { getPosition } from "../integrations/position-reader";
 import { releaseCollateralOnPolygon, settleLoanOnBase } from "../integrations/settlement-writer";
 
 const umaEventAbi = parseAbi([
-  "event AssertionSettled(bytes32 indexed assertionId, address indexed assertionCaller, bool settlementResolution, bool assertedTruthfully, address settleCaller)"
+  "event QuestionResolved(bytes32 indexed questionID, int256 settledPrice, uint256[] payouts)"
 ]);
 
 /**
- * Settlement handler - triggered by UMA AssertionSettled event
+ * Settlement handler - triggered by UMA CTF Adapter QuestionResolved event
  * 
  * Flow:
- * 1. Decode UMA oracle event (assertionId, outcome)
- * 2. Map assertionId to Polymarket tokenId (stored mapping)
+ * 1. Decode QuestionResolved event (questionID, settledPrice, payouts)
+ * 2. Map questionID to Polymarket tokenId (stored mapping)
  * 3. Read all active positions for this market from Base
  * 4. Calculate net settlement per position (collateral value - debt)
  * 5. Execute settlement on Base (HorizonVault.settleLoan)
  * 6. Release collateral from Polygon escrow
  * 
  * @param runtime - CRE runtime instance with config and secrets
- * @param log - EVM log containing the AssertionSettled event
+ * @param log - EVM log containing the QuestionResolved event
  * @returns Success message
  */
 export const settleLoan = (runtime: Runtime<Config>, log: EVMLog): string => {
@@ -41,15 +41,25 @@ export const settleLoan = (runtime: Runtime<Config>, log: EVMLog): string => {
       topics
     });
     
-    const assertionId = decoded.args.assertionId as `0x${string}`;
-    const settlementResolution = decoded.args.settlementResolution as boolean;
-    const outcome = settlementResolution ? 1 : 0; // true = YES wins, false = NO wins
+    const questionID = decoded.args.questionID as `0x${string}`;
+    const settledPrice = decoded.args.settledPrice as bigint;
+    const payouts = decoded.args.payouts as bigint[];
     
-    runtime.log(`[SETTLEMENT] AssertionId: ${assertionId}`);
-    runtime.log(`[SETTLEMENT] SettlementResolution: ${outcome === 1 ? "YES" : "NO"}`);
+    // Convert settled price to outcome
+    // 0 = NO (payouts [0,1]), 1 ether = YES (payouts [1,0]), 0.5 ether = INVALID (payouts [1,1])
+    let outcome = 0;
+    if (settledPrice === BigInt("1000000000000000000")) {
+      outcome = 1; // YES
+    } else if (settledPrice === BigInt("500000000000000000")) {
+      outcome = 2; // INVALID/TIE
+    } // else 0 = NO
+    
+    runtime.log(`[SETTLEMENT] QuestionID: ${questionID}`);
+    runtime.log(`[SETTLEMENT] SettledPrice: ${settledPrice}, Outcome: ${outcome === 1 ? "YES" : outcome === 2 ? "INVALID" : "NO"}`);
+    runtime.log(`[SETTLEMENT] Payouts: [${payouts.join(", ")}]`);
 
     const mappedTokenId =
-      runtime.config.assertionToTokenMap?.[assertionId.toLowerCase()] ?? runtime.config.activeMarkets[0]?.tokenId;
+      runtime.config.assertionToTokenMap?.[questionID.toLowerCase()] ?? runtime.config.activeMarkets[0]?.tokenId;
     if (!mappedTokenId) {
       throw new Error("No tokenId found for settlement (assertion map empty and no active market configured)");
     }
