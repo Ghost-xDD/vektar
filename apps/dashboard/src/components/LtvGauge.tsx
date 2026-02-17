@@ -131,8 +131,8 @@ export function LtvGauge({ label, value, maxBorrow, isStatic = false, isActive =
             fontSize="11"
             fontWeight="500"
             fontFamily="Inter, sans-serif"
-            textTransform="uppercase"
             letterSpacing="0.1em"
+            style={{ textTransform: 'uppercase' }}
           >
             {label}
           </text>

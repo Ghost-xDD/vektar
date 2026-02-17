@@ -6,19 +6,23 @@ interface OrderBookChartProps {
 }
 
 export function OrderBookChart({ levels, isActive }: OrderBookChartProps) {
-  const maxSize = Math.max(...levels.map(l => l.size), 1);
+  const MAX_LEVELS = 10; // Show only top 10 levels
+  const displayLevels = levels.slice(0, MAX_LEVELS);
+  const hiddenCount = levels.length - MAX_LEVELS;
+  
+  const maxSize = Math.max(...displayLevels.map(l => l.size), 1);
   const totalDepth = levels.reduce((sum, l) => sum + l.size * l.price, 0);
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-white/70">Order Book Depth (Merged Yes+No)</h3>
+        <h3 className="text-sm font-medium text-white/70">Order Book Depth (Top {MAX_LEVELS})</h3>
         <span className="text-xs font-mono text-white/40">
           Total: ${totalDepth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </span>
       </div>
 
-      {levels.map((level, i) => {
+      {displayLevels.map((level, i) => {
         const widthPercent = (level.size / maxSize) * 100;
         const intensity = isActive ? Math.max(0.2, 1 - i * 0.07) : 0.15;
 
@@ -59,6 +63,12 @@ export function OrderBookChart({ levels, isActive }: OrderBookChartProps) {
           </div>
         );
       })}
+      
+      {hiddenCount > 0 && (
+        <div className="mt-2 text-center text-[10px] text-white/30">
+          + {hiddenCount} more level{hiddenCount === 1 ? '' : 's'} (${(totalDepth - displayLevels.reduce((sum, l) => sum + l.size * l.price, 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })} depth)
+        </div>
+      )}
     </div>
   );
 }

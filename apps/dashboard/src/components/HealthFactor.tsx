@@ -32,7 +32,9 @@ export function HealthFactor({ value, isActive }: HealthFactorProps) {
             className="text-2xl font-bold font-mono transition-colors duration-500"
             style={{ color: isActive ? color : '#4b5563' }}
           >
-            {isActive && value > 0 ? value.toFixed(2) : '—'}
+            {isActive && value > 0 
+              ? value >= 100 ? '∞' : value.toFixed(2)
+              : '—'}
           </span>
           {isActive && value > 0 && (
             <span

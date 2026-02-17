@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Square, Zap, Timer, RotateCcw, ChevronDown } from 'lucide-react';
+import { Zap, Timer, ExternalLink } from 'lucide-react';
 import { LtvGauge } from './components/LtvGauge';
 import { OrderBookChart } from './components/OrderBookChart';
 import { HealthFactor } from './components/HealthFactor';
@@ -7,74 +6,34 @@ import { PositionCard } from './components/PositionCard';
 import { ActivityFeed } from './components/ActivityFeed';
 import { NetworkBadge } from './components/NetworkBadge';
 import { MetricCard } from './components/MetricCard';
-import { getInitialState, runCycle, runSettlement, type SimState } from './lib/simulation';
-
-const CYCLE_INTERVAL = 6000; // 6s for demo speed (real = 12s)
+import { INITIAL_MARKET, INITIAL_POSITION } from './lib/mock-data';
+import { useMarketLTV } from './hooks/useMarketLTV';
+import { usePosition } from './hooks/usePosition';
+import { useOrderBook, type OrderBookLevel } from './hooks/useOrderBook';
+import { useActivityEvents, type ActivityEvent } from './hooks/useActivityEvents';
 
 export default function App() {
-  const [state, setState] = useState<SimState>(getInitialState);
-  const [countdown, setCountdown] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startSimulation = useCallback(() => {
-    setState(prev => {
-      const next = runCycle(prev);
-      return next;
-    });
-
-    setCountdown(CYCLE_INTERVAL / 1000);
-
-    // Start cycle interval
-    intervalRef.current = setInterval(() => {
-      setState(prev => {
-        if (prev.phase === 'settled') {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          return prev;
-        }
-        return runCycle(prev);
-      });
-      setCountdown(CYCLE_INTERVAL / 1000);
-    }, CYCLE_INTERVAL);
-
-    // Countdown timer
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => Math.max(0, prev - 1));
-    }, 1000);
-  }, []);
-
-  const stopSimulation = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-    setState(prev => ({ ...prev, isRunning: false }));
-    setCountdown(0);
-  }, []);
-
-  const resetSimulation = useCallback(() => {
-    stopSimulation();
-    setState(getInitialState());
-  }, [stopSimulation]);
-
-  const triggerSettlement = useCallback(() => {
-    stopSimulation();
-    setState(prev => runSettlement(prev));
-  }, [stopSimulation]);
-
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, []);
-
-  const { market, position, orderBook, events, phase, cycle, isRunning } = state;
-  const isActive = phase !== 'idle';
+  // Real blockchain data
+  const { data: ltvData, isLoading: ltvLoading, error: ltvError } = useMarketLTV();
+  const { data: positionData, isLoading: positionLoading } = usePosition();
+  const { data: orderBookData, isLoading: orderBookLoading } = useOrderBook();
+  const { data: eventsData = [] as ActivityEvent[] } = useActivityEvents();
+  
+  // Use mock data for static display values
+  const market = INITIAL_MARKET;
+  const position = INITIAL_POSITION;
+  
+  // Calculate real-time values
+  const hasRealData = !ltvLoading && !!ltvData;
+  const realSpotPrice = orderBookData?.bids?.[0]?.price || market.spotPrice;
+  const realShares = positionData ? Number(positionData.collateralAmount) / 1e18 : position.collateralShares;
+  const realDebt = positionData ? Number(positionData.debtAmount) / 1e6 : position.debtUsd;
+  const collateralValue = realShares * realSpotPrice;
+  
+  // LTV-based calculations
+  const dynamicLtvPercent = ltvData?.dynamicLtvPercent || 0;
+  const maxBorrowDynamic = collateralValue * (dynamicLtvPercent / 100);
+  const maxBorrowStatic = collateralValue * 0.75;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -88,7 +47,7 @@ export default function App() {
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center">
                   <Zap className="w-4 h-4 text-white" />
                 </div>
-                {isRunning && (
+                {hasRealData && (
                   <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-bg animate-pulse" />
                 )}
               </div>
@@ -102,19 +61,27 @@ export default function App() {
 
             {/* Network Status */}
             <div className="hidden sm:flex items-center gap-2">
-              <NetworkBadge name="Base Sepolia" color="#0052ff" isConnected={isActive} />
-              <NetworkBadge name="Polygon Amoy" color="#7b3fe4" isConnected={isActive} />
-              <NetworkBadge name="Polymarket CLOB" color="#22d3ee" isConnected={isActive} />
+              <NetworkBadge name="Base Sepolia" color="#0052ff" isConnected={hasRealData} />
+              <NetworkBadge name="Polygon Amoy" color="#7b3fe4" isConnected={!!positionData} />
+              <NetworkBadge name="Polymarket CLOB" color="#22d3ee" isConnected={!!orderBookData} />
             </div>
 
-            {/* Cycle indicator */}
+            {/* Status indicator */}
             <div className="flex items-center gap-3">
-              {isRunning && (
+              {ltvLoading ? (
                 <div className="flex items-center gap-2 text-xs text-white/40">
-                  <Timer className="w-3.5 h-3.5" />
-                  <span className="font-mono">Cycle {cycle}</span>
-                  <span className="text-white/20">|</span>
-                  <span className="font-mono tabular-nums">{countdown}s</span>
+                  <Timer className="w-3.5 h-3.5 animate-spin" />
+                  <span>Connecting...</span>
+                </div>
+              ) : hasRealData ? (
+                <div className="flex items-center gap-2 text-xs text-green-400/60">
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span>Live Data</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-white/40">
+                  <div className="w-2 h-2 rounded-full bg-white/20" />
+                  <span>Waiting for CRE...</span>
                 </div>
               )}
             </div>
@@ -137,52 +104,29 @@ export default function App() {
                 {market.questionTitle}
               </h2>
               <div className="flex items-center gap-4 mt-2 text-xs text-white/40">
-                <span>Spot: <span className="text-white/70 font-mono">${market.spotPrice.toFixed(2)}</span></span>
-                <span>Shares: <span className="text-white/70 font-mono">{position.collateralShares.toLocaleString()}</span></span>
-                {isActive && (
-                  <span>TWOB Min: <span className="text-white/70 font-mono">${Math.round(market.twobMinLiquidity).toLocaleString()}</span></span>
-                )}
+                <span>Spot: <span className="text-white/70 font-mono">
+                  ${realSpotPrice.toFixed(2)}
+                </span></span>
+                <span>Shares: <span className="text-white/70 font-mono">
+                  {realShares.toLocaleString()}
+                </span></span>
+                <span>Collateral: <span className="text-white/70 font-mono">
+                  ${collateralValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                </span></span>
               </div>
             </div>
 
-            {/* Controls */}
+            {/* Link to Polymarket */}
             <div className="flex items-center gap-2">
-              {!isRunning && phase !== 'settled' && (
-                <button
-                  onClick={startSimulation}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent hover:bg-accent-dim text-white text-sm font-medium transition-colors"
-                >
-                  <Play className="w-4 h-4" />
-                  {cycle === 0 ? 'Start CRE' : 'Resume'}
-                </button>
-              )}
-              {isRunning && (
-                <button
-                  onClick={stopSimulation}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-medium transition-colors"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  Pause
-                </button>
-              )}
-              {isActive && phase !== 'settled' && (
-                <button
-                  onClick={triggerSettlement}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-sm font-medium transition-colors border border-purple-500/20"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                  Settle
-                </button>
-              )}
-              {phase === 'settled' && (
-                <button
-                  onClick={resetSimulation}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-medium transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reset
-                </button>
-              )}
+              <a
+                href="https://polymarket.com/event/what-price-will-bitcoin-hit-before-2027"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-xs font-medium transition-colors border border-white/10"
+              >
+                <ExternalLink className="w-3 h-3" />
+                View on Polymarket
+              </a>
             </div>
           </div>
 
@@ -196,9 +140,9 @@ export default function App() {
           <div className="rounded-xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-white/70">LTV Comparison</h3>
-              {isActive && market.dynamicLtv > 0 && market.dynamicLtv < market.staticLtv && (
+              {hasRealData && dynamicLtvPercent > 0 && dynamicLtvPercent < 75 && (
                 <span className="text-[10px] text-yellow-400/80 bg-yellow-400/10 px-2 py-0.5 rounded-full border border-yellow-400/20">
-                  Dynamic LTV {Math.round(market.staticLtv - market.dynamicLtv)}% lower than static
+                  Dynamic {(75 - dynamicLtvPercent).toFixed(1)}% safer
                 </span>
               )}
             </div>
@@ -206,34 +150,52 @@ export default function App() {
             <div className="flex items-center justify-center gap-6 sm:gap-12">
               <LtvGauge
                 label="STATIC"
-                value={market.staticLtv}
-                maxBorrow={market.maxBorrowStatic}
+                value={75}
+                maxBorrow={maxBorrowStatic}
                 isStatic={true}
                 isActive={true}
               />
               <LtvGauge
                 label="DYNAMIC"
-                value={market.dynamicLtv}
-                maxBorrow={market.maxBorrowDynamic}
+                value={dynamicLtvPercent}
+                maxBorrow={maxBorrowDynamic}
                 isStatic={false}
-                isActive={isActive}
+                isActive={hasRealData}
               />
             </div>
+            
+            {/* Blockchain connection status */}
+            {ltvLoading && (
+              <div className="mt-3 text-center text-xs text-white/40">
+                Loading blockchain data...
+              </div>
+            )}
+            {ltvError && (
+              <div className="mt-3 text-center text-xs text-red-400/80">
+                ⚠️ Error connecting to Base Sepolia
+              </div>
+            )}
+            {hasRealData && (
+              <div className="mt-3 text-center text-xs text-green-400/60">
+                ✓ Live data from Base Sepolia • Updates every 12s
+              </div>
+            )}
 
-            {/* Bad debt warning */}
-            {!isActive && (
+            {/* Bad debt warning when no CRE running */}
+            {!hasRealData && (
               <div className="mt-4 bg-red-500/5 border border-red-500/15 rounded-lg p-3 text-center">
                 <p className="text-xs text-red-400/80">
-                  Static LTV allows <span className="font-mono font-semibold">${market.maxBorrowStatic.toLocaleString()}</span> borrowing
+                  Static LTV allows <span className="font-mono font-semibold">${maxBorrowStatic.toLocaleString()}</span> borrowing
                   — real exit liquidity may be far lower
                 </p>
               </div>
             )}
 
-            {isActive && position.status === 'liquidatable' && (
+            {/* Liquidatable warning */}
+            {positionData?.liquidatable && (
               <div className="mt-4 bg-red-500/5 border border-red-500/20 rounded-lg p-3 text-center animate-flash-red">
                 <p className="text-xs text-red-400">
-                  Position underwater — CRE marked as LIQUIDATABLE
+                  ⚠️ Position underwater — CRE marked as LIQUIDATABLE
                 </p>
               </div>
             )}
@@ -241,39 +203,60 @@ export default function App() {
 
           {/* Order Book */}
           <div className="rounded-xl border border-border bg-surface p-5">
-            <OrderBookChart levels={orderBook} isActive={isActive} />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium text-white/70">Order Book Depth</h3>
+              {orderBookData && (
+                <span className="text-[10px] text-cyan-400/60 bg-cyan-400/10 px-2 py-0.5 rounded-full border border-cyan-400/20">
+                  Live from Polymarket
+                </span>
+              )}
+            </div>
+            <OrderBookChart 
+              levels={(orderBookData?.bids ?? []) as OrderBookLevel[]} 
+              isActive={!!orderBookData} 
+            />
+            {orderBookLoading && (
+              <div className="mt-2 text-center text-xs text-white/40">
+                Fetching order book...
+              </div>
+            )}
+            {orderBookData && orderBookData.totalBidDepth !== undefined && (
+              <div className="mt-2 text-center text-xs text-cyan-400/60">
+                ✓ ${orderBookData.totalBidDepth.toLocaleString()} total bid depth
+              </div>
+            )}
           </div>
         </div>
 
         {/* Metrics Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
-            label="VWAP"
-            value={`$${market.vwap.toFixed(4)}`}
-            subValue={`Spot: $${market.spotPrice.toFixed(2)}`}
-            color={market.vwap > 0 ? '#818cf8' : '#4b5563'}
-            isActive={isActive && market.vwap > 0}
+            label="Max Borrow (Static)"
+            value={`$${maxBorrowStatic.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            subValue="75% LTV (hardcoded)"
+            color="#6b7280"
+            isActive={true}
           />
           <MetricCard
-            label="Slippage Factor"
-            value={`${(market.slippageFactor * 100).toFixed(1)}%`}
-            subValue="VWAP / Spot Price"
-            color={market.slippageFactor > 0.8 ? '#10b981' : market.slippageFactor > 0.5 ? '#f59e0b' : '#ef4444'}
-            isActive={isActive && market.slippageFactor > 0}
+            label="Max Borrow (Dynamic)"
+            value={`$${maxBorrowDynamic.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            subValue={`${dynamicLtvPercent.toFixed(1)}% LTV (live)`}
+            color="#6366f1"
+            isActive={hasRealData}
           />
           <MetricCard
             label="Total Bid Depth"
-            value={`$${Math.round(market.totalBidDepth).toLocaleString()}`}
-            subValue={`${orderBook.length} price levels`}
+            value={`$${(orderBookData?.totalBidDepth ?? 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            subValue={`${(orderBookData?.bids ?? []).length} price levels`}
             color="#22d3ee"
-            isActive={isActive && market.totalBidDepth > 0}
+            isActive={!!orderBookData}
           />
           <MetricCard
-            label="TWOB Min"
-            value={`$${Math.round(market.twobMinLiquidity).toLocaleString()}`}
-            subValue="60s window minimum"
-            color="#a78bfa"
-            isActive={isActive && market.twobMinLiquidity > 0}
+            label="Current Debt"
+            value={`$${realDebt.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            subValue={positionData ? `Health: ${positionData.healthFactor.toFixed(2)}` : 'No position'}
+            color={positionData?.healthFactor && positionData.healthFactor > 1 ? '#10b981' : '#ef4444'}
+            isActive={!!positionData}
           />
         </div>
 
@@ -282,13 +265,35 @@ export default function App() {
           {/* Health + Position */}
           <div className="lg:col-span-1 space-y-6">
             <div className="rounded-xl border border-border bg-surface p-5">
-              <HealthFactor value={position.healthFactor} isActive={isActive} />
+              <HealthFactor 
+                value={positionData?.healthFactor ?? 0} 
+                isActive={!!positionData} 
+              />
+              {positionLoading && (
+                <div className="mt-2 text-center text-xs text-white/40">
+                  Loading position data...
+                </div>
+              )}
+              {positionData && (
+                <div className="mt-2 text-center text-xs text-green-400/60">
+                  ✓ Cross-chain data (Base + Polygon)
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-border bg-surface p-5">
               <PositionCard
-                position={position}
-                isActive={isActive}
-                collateralValueUsd={market.spotPrice * position.collateralShares}
+                position={{
+                  user: '0x311e...2308',
+                  collateralShares: realShares,
+                  collateralValueUsd: collateralValue,
+                  debtUsd: realDebt,
+                  healthFactor: positionData?.healthFactor ?? 0,
+                  status: positionData?.liquidatable ? 'liquidatable' : 'active',
+                  polygonAddress: positionData?.polygonAddress ?? '0x518316DA...35517E6',
+                  baseAddress: '0x82495884...B3edB0'
+                }}
+                isActive={!!positionData}
+                collateralValueUsd={collateralValue}
               />
             </div>
           </div>
@@ -297,11 +302,21 @@ export default function App() {
           <div className="lg:col-span-2 rounded-xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-white/70">Activity Feed</h3>
-              {events.length > 0 && (
-                <span className="text-[10px] text-white/30 font-mono">{events.length} events</span>
+              {eventsData.length > 0 && (
+                <span className="text-[10px] text-white/30 font-mono">{eventsData.length} events</span>
               )}
             </div>
-            <ActivityFeed events={events} />
+            <ActivityFeed events={eventsData} />
+            {eventsData.length > 0 && (
+              <div className="mt-3 text-center text-xs text-green-400/60">
+                ✓ Live events from Base Sepolia
+              </div>
+            )}
+            {eventsData.length === 0 && !hasRealData && (
+              <div className="flex items-center justify-center py-12 text-white/30 text-xs">
+                Waiting for CRE workflow to write transactions...
+              </div>
+            )}
           </div>
         </div>
 

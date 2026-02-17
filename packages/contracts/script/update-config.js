@@ -25,7 +25,7 @@ if (!addressRegex.test(escrowAddress) || !addressRegex.test(vaultAddress)) {
 }
 
 // Update config.json
-const configPath = path.join(__dirname, '../../apps/cre-workflow/vektar-engine/config.json');
+const configPath = path.join(__dirname, '../../../apps/cre-workflow/vektar-engine/config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 const oldEscrow = config.polygon.escrowAddress;
@@ -42,7 +42,7 @@ console.log(`   base.vaultAddress: ${oldVault} → ${vaultAddress}`);
 console.log('');
 
 // Update .env if it exists
-const envPath = path.join(__dirname, '../.env');
+const envPath = path.join(__dirname, '../../../.env');
 if (fs.existsSync(envPath)) {
   let envContent = fs.readFileSync(envPath, 'utf8');
   

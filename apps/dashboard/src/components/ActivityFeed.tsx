@@ -1,12 +1,21 @@
 import type { ActivityEvent } from '../lib/mock-data';
+import type { ActivityEvent as RealActivityEvent } from '../hooks/useActivityEvents';
 import { shortenHash } from '../lib/mock-data';
-import { ExternalLink, TrendingDown, AlertTriangle, CheckCircle, Play, Activity } from 'lucide-react';
+import {
+  ExternalLink,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  Play,
+  Activity,
+  Plus,
+} from 'lucide-react';
 
 interface ActivityFeedProps {
-  events: ActivityEvent[];
+  events: (ActivityEvent | RealActivityEvent)[];
 }
 
-function getEventIcon(type: ActivityEvent['type']) {
+function getEventIcon(type: string) {
   switch (type) {
     case 'ltv_update':
       return <TrendingDown className="w-3.5 h-3.5 text-accent-bright" />;
@@ -14,20 +23,33 @@ function getEventIcon(type: ActivityEvent['type']) {
       return <AlertTriangle className="w-3.5 h-3.5 text-red-400" />;
     case 'settlement':
       return <CheckCircle className="w-3.5 h-3.5 text-[#6366f1]" />;
+    case 'position_opened':
+      return <Plus className="w-3.5 h-3.5 text-green-400" />;
     case 'workflow_start':
       return <Play className="w-3.5 h-3.5 text-green-400" />;
     case 'health_check':
       return <Activity className="w-3.5 h-3.5 text-white/30" />;
+    default:
+      return <Activity className="w-3.5 h-3.5 text-white/30" />;
   }
 }
 
-function getEventColor(type: ActivityEvent['type']): string {
+function getEventColor(type: string): string {
   switch (type) {
-    case 'ltv_update': return 'border-l-indigo-500/50';
-    case 'liquidation': return 'border-l-red-500/50';
-    case 'settlement': return 'border-l-indigo-500/50';
-    case 'workflow_start': return 'border-l-green-500/50';
-    case 'health_check': return 'border-l-white/10';
+    case 'ltv_update':
+      return 'border-l-indigo-500/50';
+    case 'liquidation':
+      return 'border-l-red-500/50';
+    case 'settlement':
+      return 'border-l-indigo-500/50';
+    case 'position_opened':
+      return 'border-l-green-500/50';
+    case 'workflow_start':
+      return 'border-l-green-500/50';
+    case 'health_check':
+      return 'border-l-white/10';
+    default:
+      return 'border-l-white/10';
   }
 }
 
@@ -38,7 +60,12 @@ function getExplorerUrl(chain: 'base' | 'polygon', txHash: string): string {
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 export function ActivityFeed({ events }: ActivityFeedProps) {
@@ -64,7 +91,9 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-white/70 truncate">{event.description}</p>
+            <p className="text-xs text-white/70 truncate">
+              {event.description}
+            </p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[10px] text-white/30 font-mono">
                 {formatTime(event.timestamp)}
@@ -74,7 +103,10 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
                   className="text-[10px] px-1.5 py-0.5 rounded font-mono"
                   style={{
                     color: event.chain === 'base' ? '#0052ff' : '#7b3fe4',
-                    background: event.chain === 'base' ? 'rgba(0, 82, 255, 0.1)' : 'rgba(123, 63, 228, 0.1)',
+                    background:
+                      event.chain === 'base'
+                        ? 'rgba(0, 82, 255, 0.1)'
+                        : 'rgba(123, 63, 228, 0.1)',
                   }}
                 >
                   {event.chain === 'base' ? 'Base' : 'Polygon'}

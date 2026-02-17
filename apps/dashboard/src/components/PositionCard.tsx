@@ -10,19 +10,48 @@ interface PositionCardProps {
 function getStatusConfig(status: Position['status']) {
   switch (status) {
     case 'active':
-      return { label: 'Active', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.2)' };
+      return {
+        label: 'Active',
+        color: '#10b981',
+        bg: 'rgba(16, 185, 129, 0.1)',
+        border: 'rgba(16, 185, 129, 0.2)',
+      };
     case 'warning':
-      return { label: 'Warning', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.2)' };
+      return {
+        label: 'Warning',
+        color: '#f59e0b',
+        bg: 'rgba(245, 158, 11, 0.1)',
+        border: 'rgba(245, 158, 11, 0.2)',
+      };
     case 'liquidatable':
-      return { label: 'LIQUIDATABLE', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.3)' };
+      return {
+        label: 'LIQUIDATABLE',
+        color: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.1)',
+        border: 'rgba(239, 68, 68, 0.3)',
+      };
     case 'settled':
-      return { label: 'SETTLED', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', border: 'rgba(99, 102, 241, 0.3)' };
+      return {
+        label: 'SETTLED',
+        color: '#6366f1',
+        bg: 'rgba(99, 102, 241, 0.1)',
+        border: 'rgba(99, 102, 241, 0.3)',
+      };
     default:
-      return { label: 'N/A', color: '#6b7280', bg: 'transparent', border: 'transparent' };
+      return {
+        label: 'N/A',
+        color: '#6b7280',
+        bg: 'transparent',
+        border: 'transparent',
+      };
   }
 }
 
-export function PositionCard({ position, isActive, collateralValueUsd }: PositionCardProps) {
+export function PositionCard({
+  position,
+  isActive,
+  collateralValueUsd,
+}: PositionCardProps) {
   const statusConfig = getStatusConfig(position.status);
 
   return (
@@ -53,13 +82,19 @@ export function PositionCard({ position, isActive, collateralValueUsd }: Positio
             <div className="w-4 h-4 rounded-full bg-[#7b3fe4]/20 flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-[#7b3fe4]" />
             </div>
-            <span className="text-[10px] text-white/40 uppercase tracking-wider">Collateral</span>
+            <span className="text-[10px] text-white/40 uppercase tracking-wider">
+              Collateral
+            </span>
           </div>
           <p className="text-lg font-semibold font-mono text-white/90">
             {position.collateralShares.toLocaleString()}
           </p>
-          <p className="text-xs text-white/40">Yes shares (${collateralValueUsd.toLocaleString()})</p>
-          <p className="text-[10px] text-[#7b3fe4]/70 mt-1 font-mono">Polygon Amoy</p>
+          <p className="text-xs text-white/40">
+            Yes shares (${collateralValueUsd.toLocaleString()})
+          </p>
+          <p className="text-[10px] text-[#7b3fe4]/70 mt-1 font-mono">
+            Polygon Amoy
+          </p>
         </div>
 
         {/* Debt */}
@@ -68,13 +103,17 @@ export function PositionCard({ position, isActive, collateralValueUsd }: Positio
             <div className="w-4 h-4 rounded-full bg-[#0052ff]/20 flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-[#0052ff]" />
             </div>
-            <span className="text-[10px] text-white/40 uppercase tracking-wider">Debt</span>
+            <span className="text-[10px] text-white/40 uppercase tracking-wider">
+              Debt
+            </span>
           </div>
           <p className="text-lg font-semibold font-mono text-white/90">
             ${position.debtUsd.toLocaleString()}
           </p>
           <p className="text-xs text-white/40">USDC borrowed</p>
-          <p className="text-[10px] text-[#0052ff]/70 mt-1 font-mono">Base Sepolia</p>
+          <p className="text-[10px] text-[#0052ff]/70 mt-1 font-mono">
+            Base Sepolia
+          </p>
         </div>
       </div>
 
@@ -96,7 +135,9 @@ export function PositionCard({ position, isActive, collateralValueUsd }: Positio
         <div className="bg-[#6366f1]/5 rounded-lg p-3 border border-[#6366f1]/20 animate-slide-up">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
-            <span className="text-xs font-semibold text-[#6366f1]">Settlement Complete</span>
+            <span className="text-xs font-semibold text-[#6366f1]">
+              Settlement Complete
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>

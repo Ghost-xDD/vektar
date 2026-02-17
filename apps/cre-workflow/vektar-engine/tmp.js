@@ -30625,6 +30625,7 @@ var ltvConfigSchema = exports_external2.object({
 });
 var marketConfigSchema = exports_external2.object({
   tokenId: exports_external2.string(),
+  noTokenId: exports_external2.string().optional(),
   spotPrice: exports_external2.number().positive()
 });
 var addressSchema = exports_external2.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address");
@@ -30898,6 +30899,32 @@ var fetchOrderBook = (runtime2, tokenId) => {
   }
   return result;
 };
+var fetchMergedOrderBook = (runtime2, yesTokenId, noTokenId) => {
+  const yesBook = fetchOrderBook(runtime2, yesTokenId);
+  if (!noTokenId) {
+    runtime2.log("[POLYMARKET] No noTokenId configured — using Yes-only book");
+    return yesBook;
+  }
+  runtime2.log("[POLYMARKET] Fetching No token book for merged depth...");
+  const noBook = fetchOrderBook(runtime2, noTokenId);
+  const syntheticBids = noBook.asks.map((a) => ({
+    price: Math.round((1 - a.price) * 100) / 100,
+    size: a.size
+  })).filter((b) => b.price > 0 && b.size > 0);
+  const allBids = [...yesBook.bids, ...syntheticBids].sort((a, b) => b.price - a.price);
+  const syntheticAsks = noBook.bids.map((b) => ({
+    price: Math.round((1 - b.price) * 100) / 100,
+    size: b.size
+  })).filter((a) => a.price > 0 && a.size > 0);
+  const allAsks = [...yesBook.asks, ...syntheticAsks].sort((a, b) => a.price - b.price);
+  runtime2.log(`[CONSENSUS] ✓ Merged order book: ${allBids.length} bid levels, ${allAsks.length} ask levels`);
+  return {
+    tokenId: yesTokenId,
+    bids: allBids,
+    asks: allAsks,
+    timestamp: Math.max(yesBook.timestamp, noBook.timestamp)
+  };
+};
 var monitorLiquidity = async (runtime2) => {
   try {
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -30914,8 +30941,7 @@ var monitorLiquidity = async (runtime2) => {
       const shortToken = market.tokenId.substring(0, 20) + "...";
       runtime2.log(`[MONITOR] Processing market: ${shortToken}`);
       runtime2.log(`[HTTP]    Fetching Polymarket order book...`);
-      const orderBook = fetchOrderBook(runtime2, market.tokenId);
-      runtime2.log(`[CONSENSUS] ✓ Order book data retrieved (${orderBook.bids.length} bids)`);
+      const orderBook = fetchMergedOrderBook(runtime2, market.tokenId, market.noTokenId);
       const totalBidDepth = calculateTotalBidDepth(orderBook.bids);
       const twobLiquidity = getTimeWeightedLiquidity(market.tokenId, {
         tokenId: market.tokenId,
