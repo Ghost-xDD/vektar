@@ -87,6 +87,8 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
       runtime.log(
         `[COMPUTE]  Dynamic LTV: ${runtime.config.ltv.baseLTV * 100}% × ${ltvResult.slippageFactor.toFixed(2)} × ${runtime.config.ltv.safetyMargin} = ${(dynamicLtvBps / 100).toFixed(1)}%`
       );
+      runtime.log(`[DEBUG]    ltvResult.dynamicLTV (raw) = ${ltvResult.dynamicLTV}`);
+      runtime.log(`[DEBUG]    dynamicLtvBps (calculated) = ${dynamicLtvBps}`);
 
       runtime.log(`[EVM WRITE] Base → updateMarketLTV(${dynamicLtvBps} bps)`);
       const txHash = updateMarketLTV(runtime, market.tokenId, dynamicLtvBps);

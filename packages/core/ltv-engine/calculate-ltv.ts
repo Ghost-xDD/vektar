@@ -43,8 +43,18 @@ export function calculateLiquidityAdjustedLTV(
   spotPrice: number,
   config: LTVConfig
 ): LTVResult {
-  // Step 1: Simulate selling collateral into the order book
-  let remainingSize = Number(collateralSize);
+  // Step 1: Convert collateral from wei (1e18) to whole tokens
+  // ERC-1155 shares have 18 decimals, but order book sizes are in whole tokens
+  const collateralTokens = Number(collateralSize) / 1e18;
+  
+  // Debug: Log conversion (remove after testing)
+  if (typeof console !== 'undefined') {
+    console.log(`[LTV-ENGINE] Collateral: ${collateralSize.toString()} wei = ${collateralTokens} tokens`);
+    console.log(`[LTV-ENGINE] Order book depth: ${orderBook.bids.length} levels`);
+  }
+  
+  // Step 2: Simulate selling collateral into the order book
+  let remainingSize = collateralTokens;
   let totalValue = 0;
   
   for (const bid of orderBook.bids) {
@@ -66,7 +76,7 @@ export function calculateLiquidityAdjustedLTV(
   }
   
   // Step 3: Calculate VWAP and slippage factor
-  const vwap = totalValue / Number(collateralSize);
+  const vwap = totalValue / collateralTokens;
   const slippageFactor = vwap / spotPrice;
   
   // Step 4: Apply formula with safety margin

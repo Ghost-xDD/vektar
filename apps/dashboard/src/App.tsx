@@ -34,6 +34,12 @@ export default function App() {
   const dynamicLtvPercent = ltvData?.dynamicLtvPercent || 0;
   const maxBorrowDynamic = collateralValue * (dynamicLtvPercent / 100);
   const maxBorrowStatic = collateralValue * 0.75;
+  
+  // Calculate health factor correctly using real spot price
+  // Health Factor = (collateralValue × dynamicLTV) / debt
+  // The contract's calculateHealthFactor assumes $1.00/share (wrong!)
+  // We override it here with correct calculation using real spot price
+  const realHealthFactor = realDebt > 0 ? maxBorrowDynamic / realDebt : 999;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -254,9 +260,9 @@ export default function App() {
           <MetricCard
             label="Current Debt"
             value={`$${realDebt.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-            subValue={positionData ? `Health: ${positionData.healthFactor.toFixed(2)}` : 'No position'}
-            color={positionData?.healthFactor && positionData.healthFactor > 1 ? '#10b981' : '#ef4444'}
-            isActive={!!positionData}
+            subValue={positionData && hasRealData ? `Health: ${realHealthFactor.toFixed(2)}` : 'No position'}
+            color={realHealthFactor > 1 ? '#10b981' : '#ef4444'}
+            isActive={!!positionData && hasRealData}
           />
         </div>
 
@@ -266,8 +272,8 @@ export default function App() {
           <div className="lg:col-span-1 space-y-6">
             <div className="rounded-xl border border-border bg-surface p-5">
               <HealthFactor 
-                value={positionData?.healthFactor ?? 0} 
-                isActive={!!positionData} 
+                value={realHealthFactor} 
+                isActive={!!positionData && hasRealData} 
               />
               {positionLoading && (
                 <div className="mt-2 text-center text-xs text-white/40">
@@ -287,7 +293,7 @@ export default function App() {
                   collateralShares: realShares,
                   collateralValueUsd: collateralValue,
                   debtUsd: realDebt,
-                  healthFactor: positionData?.healthFactor ?? 0,
+                  healthFactor: realHealthFactor,
                   status: positionData?.liquidatable ? 'liquidatable' : 'active',
                   polygonAddress: positionData?.polygonAddress ?? '0x518316DA...35517E6',
                   baseAddress: '0x82495884...B3edB0'

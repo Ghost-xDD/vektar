@@ -30639,7 +30639,12 @@ var configSchema = exports_external2.object({
   assertionToTokenMap: exports_external2.record(exports_external2.string(), exports_external2.string()).optional()
 });
 function calculateLiquidityAdjustedLTV(orderBook, collateralSize, spotPrice, config2) {
-  let remainingSize = Number(collateralSize);
+  const collateralTokens = Number(collateralSize) / 1000000000000000000;
+  if (typeof console !== "undefined") {
+    console.log(`[LTV-ENGINE] Collateral: ${collateralSize.toString()} wei = ${collateralTokens} tokens`);
+    console.log(`[LTV-ENGINE] Order book depth: ${orderBook.bids.length} levels`);
+  }
+  let remainingSize = collateralTokens;
   let totalValue = 0;
   for (const bid of orderBook.bids) {
     if (remainingSize <= 0)
@@ -30656,7 +30661,7 @@ function calculateLiquidityAdjustedLTV(orderBook, collateralSize, spotPrice, con
       exitLiquidity: totalValue
     };
   }
-  const vwap = totalValue / Number(collateralSize);
+  const vwap = totalValue / collateralTokens;
   const slippageFactor = vwap / spotPrice;
   const dynamicLTV = config2.baseLTV * slippageFactor * config2.safetyMargin;
   const finalLTV = Math.max(0, Math.min(dynamicLTV, config2.baseLTV));
@@ -30966,6 +30971,8 @@ var monitorLiquidity = async (runtime2) => {
       runtime2.log(`[COMPUTE]  VWAP simulation: $${ltvResult.vwap.toFixed(2)}`);
       runtime2.log(`[COMPUTE]  Slippage factor: ${(ltvResult.slippageFactor * 100).toFixed(1)}%`);
       runtime2.log(`[COMPUTE]  Dynamic LTV: ${runtime2.config.ltv.baseLTV * 100}% × ${ltvResult.slippageFactor.toFixed(2)} × ${runtime2.config.ltv.safetyMargin} = ${(dynamicLtvBps / 100).toFixed(1)}%`);
+      runtime2.log(`[DEBUG]    ltvResult.dynamicLTV (raw) = ${ltvResult.dynamicLTV}`);
+      runtime2.log(`[DEBUG]    dynamicLtvBps (calculated) = ${dynamicLtvBps}`);
       runtime2.log(`[EVM WRITE] Base → updateMarketLTV(${dynamicLtvBps} bps)`);
       const txHash = updateMarketLTV(runtime2, market.tokenId, dynamicLtvBps);
       runtime2.log(`[TX]       ✓ ${txHash}`);

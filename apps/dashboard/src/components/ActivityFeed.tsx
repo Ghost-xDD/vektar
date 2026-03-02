@@ -9,6 +9,8 @@ import {
   Play,
   Activity,
   Plus,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 
 interface ActivityFeedProps {
@@ -25,6 +27,10 @@ function getEventIcon(type: string) {
       return <CheckCircle className="w-3.5 h-3.5 text-[#6366f1]" />;
     case 'position_opened':
       return <Plus className="w-3.5 h-3.5 text-green-400" />;
+    case 'collateral_deposited':
+      return <Lock className="w-3.5 h-3.5 text-purple-400" />;
+    case 'collateral_released':
+      return <Unlock className="w-3.5 h-3.5 text-green-400" />;
     case 'workflow_start':
       return <Play className="w-3.5 h-3.5 text-green-400" />;
     case 'health_check':
@@ -43,6 +49,10 @@ function getEventColor(type: string): string {
     case 'settlement':
       return 'border-l-indigo-500/50';
     case 'position_opened':
+      return 'border-l-green-500/50';
+    case 'collateral_deposited':
+      return 'border-l-purple-500/50';
+    case 'collateral_released':
       return 'border-l-green-500/50';
     case 'workflow_start':
       return 'border-l-green-500/50';
@@ -79,13 +89,17 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
 
   return (
     <div className="space-y-0.5 max-h-[320px] overflow-y-auto pr-1">
-      {events.map((event, i) => (
-        <div
-          key={event.id}
-          className={`flex items-start gap-3 px-3 py-2 rounded-md border-l-2 ${getEventColor(event.type)} hover:bg-white/[0.02] transition-colors ${
-            i === 0 ? 'animate-slide-up' : ''
-          }`}
-        >
+      {events.map((event, i) => {
+        // Dim unchanged LTV monitoring events for less visual noise
+        const isUnchanged = event.type === 'ltv_update' && 'hasChange' in event && !event.hasChange;
+        
+        return (
+          <div
+            key={event.id}
+            className={`flex items-start gap-3 px-3 py-2 rounded-md border-l-2 ${getEventColor(event.type)} hover:bg-white/[0.02] transition-colors ${
+              i === 0 ? 'animate-slide-up' : ''
+            } ${isUnchanged ? 'opacity-40' : ''}`}
+          >
           {/* Icon */}
           <div className="mt-0.5 shrink-0">{getEventIcon(event.type)}</div>
 
@@ -128,7 +142,8 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
             </a>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

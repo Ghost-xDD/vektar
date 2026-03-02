@@ -37,23 +37,12 @@ export function usePosition() {
           args: [USER_ADDRESS, TOKEN_ID],
         })) as bigint;
 
-        // Calculate health factor from Base
-        const healthFactor = (await baseClient.readContract({
-          address: VAULT_ADDRESS,
-          abi: vaultAbi,
-          functionName: 'calculateHealthFactor',
-          args: [USER_ADDRESS, TOKEN_ID],
-        })) as bigint;
-
-        // Convert health factor (bps to decimal)
-        // If no debt, health factor will be extremely high or infinite - cap at 999
-        let healthFactorDecimal = Number(healthFactor) / 10000;
-        if (
-          !Number.isFinite(healthFactorDecimal) ||
-          healthFactorDecimal > 999
-        ) {
-          healthFactorDecimal = 999;
-        }
+        // NOTE: Contract's calculateHealthFactor assumes $1.00 per share (simplified)
+        // For accurate health factor, we need to calculate client-side using real spot price
+        // This will be fixed by reading spot price from order book in the dashboard
+        // 
+        // For now, return a placeholder that the dashboard will override
+        const healthFactorDecimal = 0; // Calculated in App.tsx using real prices
 
         return {
           tokenId: position[0],
