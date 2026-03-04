@@ -1,12 +1,11 @@
 #!/bin/bash
-# Run with CRISIS liquidity scenario (mock data)
-# Shows extreme LTV drop to ~15%
+# Run one settlement oracle cycle with CRISIS liquidity scenario
+# Real order book data transformed: 97% liquidity drain + 20% price decay
+# Demonstrates: spot price $X, oracle says $0 — the liquidity illusion in action
 
 set -e
-
 cd "$(dirname "$0")"
 
-# Load environment variables
 if [ -f .env ]; then
   set -a && source .env && set +a
 fi
@@ -16,19 +15,18 @@ if [ -z "$CRE_ETH_PRIVATE_KEY" ]; then
   exit 1
 fi
 
-# Update config to use crisis scenario
 jq '.demo.scenario = "crisis"' vektar-engine/config.json > vektar-engine/config.json.tmp && \
   mv vektar-engine/config.json.tmp vektar-engine/config.json
 
 echo "=========================================="
-echo "🔥 Running with CRISIS liquidity scenario"
+echo "🔥 Settlement Oracle — Crisis Scenario"
 echo "=========================================="
 echo ""
-echo "Mock order book:"
-echo "  - Only ~\$200 total liquidity"
-echo "  - Best bid: \$0.30 (far from \$0.42 spot)"
-echo "  - Expected LTV: ~15%"
-echo "  - WILL trigger liquidation"
+echo "Transformation applied to real order book:"
+echo "  - 97% liquidity drain (3% of real bids survive)"
+echo "  - 20% price decay (panic selling pressure)"
+echo "  - Result: settlement value collapses toward \$0"
+echo "  - Spot price unchanged — this is the liquidity illusion"
 echo ""
 
 cre workflow simulate vektar-engine \
@@ -37,7 +35,7 @@ cre workflow simulate vektar-engine \
   --target local-simulation \
   --broadcast 2>&1 | grep -v "Update available" || true
 
-# Reset back to normal
+# Reset to normal
 jq '.demo.scenario = "normal"' vektar-engine/config.json > vektar-engine/config.json.tmp && \
   mv vektar-engine/config.json.tmp vektar-engine/config.json
 

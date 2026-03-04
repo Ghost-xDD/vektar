@@ -30560,7 +30560,8 @@ var baseConfigSchema = exports_external2.object({
   chainSelectorName: exports_external2.string().min(1),
   isTestnet: exports_external2.boolean().optional(),
   vaultAddress: exports_external2.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address"),
-  gasLimit: exports_external2.string().regex(/^\d+$/).refine((val) => Number(val) > 0)
+  gasLimit: exports_external2.string().regex(/^\d+$/).refine((val) => Number(val) > 0),
+  rpcUrl: exports_external2.string().url().optional()
 });
 var polymarketConfigSchema = exports_external2.object({
   apiUrl: exports_external2.string().min(1).refine((val) => /^https?:\/\//.test(val), "apiUrl must start with http:// or https://"),
@@ -30708,119 +30709,103 @@ var getBaseClient = (runtime2) => {
   }
   return new cre.capabilities.EVMClient(network248.chainSelector.selector);
 };
-var updateMarketLTV = (runtime2, tokenId, newLTVBps) => {
-  const vaultAddress = runtime2.config.base.vaultAddress;
-  if (isPlaceholderAddress2(vaultAddress)) {
-    runtime2.log("[LTV] Placeholder vault address configured; skipping updateMarketLTV write");
-    return "0x";
-  }
-  const reportData = encodeFunctionData({
-    abi: parseAbi(["function updateMarketLTV(uint256 tokenId, uint256 newLTV, bytes proof)"]),
-    functionName: "updateMarketLTV",
-    args: [BigInt(tokenId), BigInt(newLTVBps), "0x"]
-  });
-  const report2 = runtime2.report({
-    encodedPayload: hexToBase64(reportData),
-    encoderName: "evm",
-    signingAlgo: "ecdsa",
-    hashingAlgo: "keccak256"
-  }).result();
-  const evmClient = getBaseClient(runtime2);
-  const writeResult = evmClient.writeReport(runtime2, {
-    receiver: vaultAddress,
-    report: report2,
-    gasConfig: {
-      gasLimit: runtime2.config.base.gasLimit
-    }
-  }).result();
-  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
-  if (writeResult.txStatus !== TxStatus.SUCCESS) {
-    throw new Error(`updateMarketLTV write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
-  }
-  return txHash;
-};
-var markLiquidatable = (runtime2, user, tokenId) => {
-  const vaultAddress = runtime2.config.base.vaultAddress;
-  if (isPlaceholderAddress2(vaultAddress)) {
-    runtime2.log("[LTV] Placeholder vault address configured; skipping markLiquidatable write");
-    return "0x";
-  }
-  const reportData = encodeFunctionData({
-    abi: parseAbi(["function markLiquidatable(address user, uint256 tokenId, bytes proof)"]),
-    functionName: "markLiquidatable",
-    args: [user, BigInt(tokenId), "0x"]
-  });
-  const report2 = runtime2.report({
-    encodedPayload: hexToBase64(reportData),
-    encoderName: "evm",
-    signingAlgo: "ecdsa",
-    hashingAlgo: "keccak256"
-  }).result();
-  const evmClient = getBaseClient(runtime2);
-  const writeResult = evmClient.writeReport(runtime2, {
-    receiver: vaultAddress,
-    report: report2,
-    gasConfig: {
-      gasLimit: runtime2.config.base.gasLimit
-    }
-  }).result();
-  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
-  if (writeResult.txStatus !== TxStatus.SUCCESS) {
-    throw new Error(`markLiquidatable write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
-  }
-  return txHash;
-};
-var vaultAbi = parseAbi([
-  "function positions(address user, uint256 tokenId) view returns (uint256 tokenIdValue, uint256 collateralAmount, uint256 debtAmount, uint256 lastLTVUpdate, bool liquidatable, uint256 liquidatableTimestamp, address polygonAddress)",
-  "function markets(uint256 tokenId) view returns (uint256 currentLTV, uint256 lastUpdate, uint256 totalCollateral, bool active)",
-  "function getActiveMarkets() view returns (uint256[])"
-]);
-var isPlaceholderAddress3 = (address) => {
-  try {
-    return BigInt(address) <= 0x1000n;
-  } catch {
-    return false;
-  }
-};
-var getBaseClient2 = (runtime2) => {
+var getPolygonClient2 = (runtime2) => {
   const network248 = getNetwork({
     chainFamily: "evm",
-    chainSelectorName: runtime2.config.base.chainSelectorName,
-    isTestnet: runtime2.config.base.isTestnet || false
+    chainSelectorName: runtime2.config.polygon.chainSelectorName,
+    isTestnet: runtime2.config.polygon.isTestnet || false
   });
   if (!network248) {
-    throw new Error(`Base network not found: ${runtime2.config.base.chainSelectorName}`);
+    throw new Error(`Polygon network not found: ${runtime2.config.polygon.chainSelectorName}`);
   }
   return new cre.capabilities.EVMClient(network248.chainSelector.selector);
 };
-var getPosition = (runtime2, user, tokenId) => {
+var updateSettlementValue = (runtime2, tokenId, settlementValueUSDC) => {
   const vaultAddress = runtime2.config.base.vaultAddress;
-  if (isPlaceholderAddress3(vaultAddress)) {
-    return { tokenIdValue: 0n, collateralAmount: 0n, debtAmount: 0n, liquidatable: false };
+  if (isPlaceholderAddress2(vaultAddress)) {
+    runtime2.log("[ORACLE] Placeholder vault address; skipping updateSettlementValue write");
+    return "0x";
   }
-  const callData = encodeFunctionData({
-    abi: vaultAbi,
-    functionName: "positions",
-    args: [user, BigInt(tokenId)]
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function updateSettlementValue(uint256 tokenId, uint256 newValue)"]),
+    functionName: "updateSettlementValue",
+    args: [BigInt(tokenId), BigInt(settlementValueUSDC)]
   });
-  const evmClient = getBaseClient2(runtime2);
-  const result = evmClient.callContract(runtime2, {
-    call: {
-      to: hexToBase64(vaultAddress),
-      data: hexToBase64(callData)
-    }
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(reportData),
+    encoderName: "evm",
+    signingAlgo: "ecdsa",
+    hashingAlgo: "keccak256"
   }).result();
-  const decoded = decodeFunctionResult({
-    abi: vaultAbi,
-    functionName: "positions",
-    data: bytesToHex(result.data)
+  const evmClient = getBaseClient(runtime2);
+  const writeResult = evmClient.writeReport(runtime2, {
+    receiver: vaultAddress,
+    report: report2,
+    gasConfig: { gasLimit: runtime2.config.base.gasLimit }
+  }).result();
+  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
+  if (writeResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`updateSettlementValue write failed: txStatus=${writeResult.txStatus} txHash=${txHash}`);
+  }
+  return txHash;
+};
+var settlePositionOnBase = (runtime2, user, tokenId, outcome) => {
+  const vaultAddress = runtime2.config.base.vaultAddress;
+  if (isPlaceholderAddress2(vaultAddress)) {
+    runtime2.log("[SETTLEMENT] Placeholder vault address; skipping settlePosition write");
+    return "0x";
+  }
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function settlePosition(address user, uint256 tokenId, uint8 outcome)"]),
+    functionName: "settlePosition",
+    args: [user, BigInt(tokenId), outcome]
   });
-  return {
-    tokenIdValue: decoded[0],
-    collateralAmount: decoded[1],
-    debtAmount: decoded[2],
-    liquidatable: decoded[4]
-  };
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(reportData),
+    encoderName: "evm",
+    signingAlgo: "ecdsa",
+    hashingAlgo: "keccak256"
+  }).result();
+  const evmClient = getBaseClient(runtime2);
+  const writeResult = evmClient.writeReport(runtime2, {
+    receiver: vaultAddress,
+    report: report2,
+    gasConfig: { gasLimit: runtime2.config.base.gasLimit }
+  }).result();
+  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
+  if (writeResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`settlePositionOnBase write failed: txStatus=${writeResult.txStatus} txHash=${txHash}`);
+  }
+  return txHash;
+};
+var releaseCollateralOnPolygon = (runtime2, user, tokenId, outcome) => {
+  const escrowAddress = runtime2.config.polygon.escrowAddress;
+  if (isPlaceholderAddress2(escrowAddress)) {
+    runtime2.log("[SETTLEMENT] Placeholder escrow address; skipping releaseOnSettlement write");
+    return "0x";
+  }
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function releaseOnSettlement(address user, uint256 tokenId, uint8 outcome)"]),
+    functionName: "releaseOnSettlement",
+    args: [user, BigInt(tokenId), outcome]
+  });
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(reportData),
+    encoderName: "evm",
+    signingAlgo: "ecdsa",
+    hashingAlgo: "keccak256"
+  }).result();
+  const evmClient = getPolygonClient2(runtime2);
+  const writeResult = evmClient.writeReport(runtime2, {
+    receiver: escrowAddress,
+    report: report2,
+    gasConfig: { gasLimit: runtime2.config.polygon.gasLimit }
+  }).result();
+  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
+  if (writeResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`releaseCollateralOnPolygon write failed: txStatus=${writeResult.txStatus} txHash=${txHash}`);
+  }
+  return txHash;
 };
 var buildBookRequest = (apiUrl, tokenId) => (sendRequester) => {
   const req = {
@@ -30918,18 +30903,18 @@ var monitorLiquidity = async (runtime2) => {
   try {
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     runtime2.log("[TRIGGER] Cron fired: */12 * * * * *");
-    runtime2.log("[MONITOR] Liquidity monitoring cycle started");
+    runtime2.log("[ORACLE]  Settlement oracle cycle started");
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     const markets = runtime2.config.activeMarkets;
     if (markets.length === 0) {
-      runtime2.log("[MONITOR] No active markets configured");
+      runtime2.log("[ORACLE] No active markets configured");
       return "No active markets";
     }
-    runtime2.log(`[MONITOR] Processing ${markets.length} market(s)`);
+    runtime2.log(`[ORACLE] Processing ${markets.length} market(s)`);
     for (const market of markets) {
       const shortToken = market.tokenId.substring(0, 20) + "...";
-      runtime2.log(`[MONITOR] Processing market: ${shortToken}`);
-      runtime2.log(`[HTTP]    Fetching Polymarket order book...`);
+      runtime2.log(`[ORACLE] Market: ${shortToken}`);
+      runtime2.log(`[HTTP]   Fetching Polymarket order book (via Confidential HTTP — token_id hidden)...`);
       const orderBook = fetchMergedOrderBook(runtime2, market.tokenId, market.noTokenId);
       const totalBidDepth = calculateTotalBidDepth(orderBook.bids);
       const twobLiquidity = getTimeWeightedLiquidity(market.tokenId, {
@@ -30938,11 +30923,11 @@ var monitorLiquidity = async (runtime2) => {
         totalBidDepth,
         timestamp: orderBook.timestamp
       }, runtime2.config.ltv.twobWindow);
-      runtime2.log(`[MONITOR] TWOB min liquidity: ${twobLiquidity} (over ${runtime2.config.ltv.twobWindow} cycles)`);
+      runtime2.log(`[ORACLE] TWOB min liquidity: $${twobLiquidity.toFixed(2)} (over ${runtime2.config.ltv.twobWindow} cycles)`);
       runtime2.log(`[EVM READ] Polygon → getTotalLocked() for market...`);
       let totalLocked = getTotalLockedCollateral(runtime2, market.tokenId);
       if (totalLocked <= 0n) {
-        runtime2.log(`[MONITOR] No locked collateral for ${market.tokenId}, using 1e18 for demo`);
+        runtime2.log(`[ORACLE] No locked collateral for ${shortToken}, using 1e18 for demo`);
         totalLocked = 1000000000000000000n;
       }
       const ltvResult = calculateLiquidityAdjustedLTV({ bids: orderBook.bids }, totalLocked, market.spotPrice, {
@@ -30951,149 +30936,35 @@ var monitorLiquidity = async (runtime2) => {
         maxLTVIncreasePerCycle: runtime2.config.ltv.maxLTVIncreasePerCycle,
         liquidationThreshold: runtime2.config.ltv.liquidationThreshold
       });
-      const dynamicLtvBps = Math.max(0, Math.min(1e4, Math.round(ltvResult.dynamicLTV * 1e4)));
-      runtime2.log(`[COMPUTE]  VWAP simulation: $${ltvResult.vwap.toFixed(2)}`);
-      runtime2.log(`[COMPUTE]  Slippage factor: ${(ltvResult.slippageFactor * 100).toFixed(1)}%`);
-      runtime2.log(`[COMPUTE]  Dynamic LTV: ${runtime2.config.ltv.baseLTV * 100}% × ${ltvResult.slippageFactor.toFixed(2)} × ${runtime2.config.ltv.safetyMargin} = ${(dynamicLtvBps / 100).toFixed(1)}%`);
-      runtime2.log(`[DEBUG]    ltvResult.dynamicLTV (raw) = ${ltvResult.dynamicLTV}`);
-      runtime2.log(`[DEBUG]    dynamicLtvBps (calculated) = ${dynamicLtvBps}`);
-      runtime2.log(`[EVM WRITE] Base → updateMarketLTV(${dynamicLtvBps} bps)`);
-      const txHash = updateMarketLTV(runtime2, market.tokenId, dynamicLtvBps);
+      const calculatedExitValue = ltvResult.vwap * totalBidDepth * runtime2.config.ltv.safetyMargin;
+      const settlementValueUSDC = Math.max(0, Math.floor(calculatedExitValue * 1e6));
+      runtime2.log(`[COMPUTE] VWAP:              $${ltvResult.vwap.toFixed(4)}/share`);
+      runtime2.log(`[COMPUTE] Bid depth:         $${totalBidDepth.toFixed(2)}`);
+      runtime2.log(`[COMPUTE] Safety margin:     ${(runtime2.config.ltv.safetyMargin * 100).toFixed(0)}%`);
+      runtime2.log(`[COMPUTE] Settlement value:  $${(settlementValueUSDC / 1e6).toFixed(2)} USDC`);
+      runtime2.log(`[COMPUTE] (spot price says:  $${(market.spotPrice * Number(totalLocked) / 1000000000000000000).toFixed(2)} — liquidity illusion gap)`);
+      runtime2.log(`[EVM WRITE] Base → SettlementVault.updateSettlementValue(${settlementValueUSDC})`);
+      const txHash = updateSettlementValue(runtime2, market.tokenId, settlementValueUSDC);
       runtime2.log(`[TX]       ✓ ${txHash}`);
-      if (runtime2.config.watchedUsers.length === 0) {
-        runtime2.log("[MONITOR] No watchedUsers configured; skipping liquidation checks");
-        continue;
-      }
-      for (const user of runtime2.config.watchedUsers) {
-        const pos = getPosition(runtime2, user, market.tokenId);
-        if (pos.debtAmount === 0n) {
-          continue;
-        }
-        const spotPriceUsd6 = BigInt(Math.round(market.spotPrice * 1e6));
-        const collateralUsd6 = pos.collateralAmount * spotPriceUsd6 / 1000000000000000000n;
-        const maxBorrowUsd6 = collateralUsd6 * BigInt(dynamicLtvBps) / 10000n;
-        const healthBps = maxBorrowUsd6 * 10000n / pos.debtAmount;
-        const healthFactor = Number(healthBps) / 1e4;
-        const shortUser = user.substring(0, 6) + "..." + user.substring(user.length - 4);
-        runtime2.log(`[MONITOR] user=${shortUser} debtUsd6=${pos.debtAmount} collateralUsd6=${collateralUsd6} health=${healthFactor.toFixed(4)}`);
-        const thresholdBps = BigInt(Math.round(runtime2.config.ltv.liquidationThreshold * 1e4));
-        if (healthBps < thresholdBps) {
-          if (pos.liquidatable) {
-            runtime2.log(`[MONITOR] Position already marked liquidatable (skip)`);
-          } else {
-            runtime2.log(`[MONITOR] ⚠ Health factor < 1.0 — marking position liquidatable`);
-            runtime2.log(`[EVM WRITE] Base → markLiquidatable(${shortUser}, ...)`);
-            try {
-              const markTx = markLiquidatable(runtime2, user, market.tokenId);
-              runtime2.log(`[TX]       ✓ ${markTx}`);
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              if (msg.includes("nonce too low") || msg.includes("already known")) {
-                runtime2.log(`[MONITOR] Position already marked or tx pending (skip)`);
-              } else {
-                throw err;
-              }
-            }
-          }
-        }
-      }
     }
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    runtime2.log("[MONITOR] ✅ Liquidity monitoring cycle completed");
+    runtime2.log("[ORACLE] ✅ Settlement oracle cycle completed");
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    return "Liquidity monitoring complete";
+    return "Settlement oracle cycle complete";
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     runtime2.log(`[ERROR] monitorLiquidity: ${msg}`);
     throw err;
   }
 };
-var isPlaceholderAddress4 = (address) => {
-  try {
-    return BigInt(address) <= 0x1000n;
-  } catch {
-    return false;
-  }
-};
-var getClient = (runtime2, chainSelectorName, isTestnet) => {
-  const network248 = getNetwork({
-    chainFamily: "evm",
-    chainSelectorName,
-    isTestnet: isTestnet || false
-  });
-  if (!network248) {
-    throw new Error(`Network not found: ${chainSelectorName}`);
-  }
-  return new cre.capabilities.EVMClient(network248.chainSelector.selector);
-};
-var settleLoanOnBase = (runtime2, user, tokenId, outcome, netSettlement) => {
-  const vaultAddress = runtime2.config.base.vaultAddress;
-  if (isPlaceholderAddress4(vaultAddress)) {
-    runtime2.log("[SETTLEMENT] Placeholder vault address configured; skipping settleLoan write");
-    return "0x";
-  }
-  const reportData = encodeFunctionData({
-    abi: parseAbi(["function settleLoan(address user, uint256 tokenId, uint8 outcome, int256 netSettlement, bytes proof)"]),
-    functionName: "settleLoan",
-    args: [user, BigInt(tokenId), outcome, netSettlement, "0x"]
-  });
-  const report2 = runtime2.report({
-    encodedPayload: hexToBase64(reportData),
-    encoderName: "evm",
-    signingAlgo: "ecdsa",
-    hashingAlgo: "keccak256"
-  }).result();
-  const evmClient = getClient(runtime2, runtime2.config.base.chainSelectorName, runtime2.config.base.isTestnet);
-  const writeResult = evmClient.writeReport(runtime2, {
-    receiver: vaultAddress,
-    report: report2,
-    gasConfig: {
-      gasLimit: runtime2.config.base.gasLimit
-    }
-  }).result();
-  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
-  if (writeResult.txStatus !== TxStatus.SUCCESS) {
-    throw new Error(`settleLoanOnBase write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
-  }
-  return txHash;
-};
-var releaseCollateralOnPolygon = (runtime2, user, tokenId, outcome) => {
-  const escrowAddress = runtime2.config.polygon.escrowAddress;
-  if (isPlaceholderAddress4(escrowAddress)) {
-    runtime2.log("[SETTLEMENT] Placeholder escrow address configured; skipping releaseOnSettlement write");
-    return "0x";
-  }
-  const reportData = encodeFunctionData({
-    abi: parseAbi(["function releaseOnSettlement(address user, uint256 tokenId, uint8 outcome)"]),
-    functionName: "releaseOnSettlement",
-    args: [user, BigInt(tokenId), outcome]
-  });
-  const report2 = runtime2.report({
-    encodedPayload: hexToBase64(reportData),
-    encoderName: "evm",
-    signingAlgo: "ecdsa",
-    hashingAlgo: "keccak256"
-  }).result();
-  const evmClient = getClient(runtime2, runtime2.config.polygon.chainSelectorName, runtime2.config.polygon.isTestnet);
-  const writeResult = evmClient.writeReport(runtime2, {
-    receiver: escrowAddress,
-    report: report2,
-    gasConfig: {
-      gasLimit: runtime2.config.polygon.gasLimit
-    }
-  }).result();
-  const txHash = bytesToHex(writeResult.txHash ?? new Uint8Array(32));
-  if (writeResult.txStatus !== TxStatus.SUCCESS) {
-    throw new Error(`releaseCollateralOnPolygon write failed with txStatus=${writeResult.txStatus}. txHash=${txHash}`);
-  }
-  return txHash;
-};
 var umaEventAbi = parseAbi([
   "event QuestionResolved(bytes32 indexed questionID, int256 settledPrice, uint256[] payouts)"
 ]);
-var settleLoan = (runtime2, log) => {
+var settlePosition = (runtime2, log) => {
   try {
-    runtime2.log("[SETTLEMENT] Market resolution detected");
+    runtime2.log("[SETTLEMENT] ─────────────────────────────────────");
+    runtime2.log("[SETTLEMENT] Market resolution event detected");
+    runtime2.log("[SETTLEMENT] ─────────────────────────────────────");
     const topics = log.topics.map((t) => bytesToHex(t));
     const data = bytesToHex(log.data);
     const decoded = decodeEventLog({
@@ -31110,38 +30981,148 @@ var settleLoan = (runtime2, log) => {
     } else if (settledPrice === BigInt("500000000000000000")) {
       outcome = 2;
     }
-    runtime2.log(`[SETTLEMENT] QuestionID: ${questionID}`);
-    runtime2.log(`[SETTLEMENT] SettledPrice: ${settledPrice}, Outcome: ${outcome === 1 ? "YES" : outcome === 2 ? "INVALID" : "NO"}`);
-    runtime2.log(`[SETTLEMENT] Payouts: [${payouts.join(", ")}]`);
+    runtime2.log(`[SETTLEMENT] questionID:    ${questionID}`);
+    runtime2.log(`[SETTLEMENT] settledPrice:  ${settledPrice}`);
+    runtime2.log(`[SETTLEMENT] outcome:       ${outcome === 1 ? "YES ✓" : outcome === 2 ? "INVALID" : "NO ✗"}`);
+    runtime2.log(`[SETTLEMENT] payouts:       [${payouts.join(", ")}]`);
     const mappedTokenId = runtime2.config.assertionToTokenMap?.[questionID.toLowerCase()] ?? runtime2.config.activeMarkets[0]?.tokenId;
     if (!mappedTokenId) {
-      throw new Error("No tokenId found for settlement (assertion map empty and no active market configured)");
+      throw new Error("No tokenId found for resolved questionID — check assertionToTokenMap in config.json");
     }
-    runtime2.log(`[SETTLEMENT] Using tokenId=${mappedTokenId}`);
+    runtime2.log(`[SETTLEMENT] tokenId:       ${mappedTokenId.substring(0, 20)}...`);
     if (runtime2.config.watchedUsers.length === 0) {
-      runtime2.log("[SETTLEMENT] No watchedUsers configured; nothing to settle");
+      runtime2.log("[SETTLEMENT] No watchedUsers configured; skipping position settlement");
       return "Settlement complete (no users)";
     }
     for (const user of runtime2.config.watchedUsers) {
-      const pos = getPosition(runtime2, user, mappedTokenId);
-      if (pos.debtAmount === 0n && pos.collateralAmount === 0n) {
-        continue;
-      }
-      const netSettlement = outcome === 1 ? pos.collateralAmount - pos.debtAmount : -pos.debtAmount;
-      const baseTx = settleLoanOnBase(runtime2, user, mappedTokenId, outcome, netSettlement);
-      runtime2.log(`[SETTLEMENT] settleLoanOnBase user=${user} txHash=${baseTx}`);
+      runtime2.log(`[SETTLEMENT] Settling position for user: ${user.substring(0, 8)}...`);
+      runtime2.log(`[EVM WRITE] Base → SettlementVault.settlePosition(${user}, ..., ${outcome})`);
+      const baseTx = settlePositionOnBase(runtime2, user, mappedTokenId, outcome);
+      runtime2.log(`[TX]        ✓ ${baseTx}`);
+      runtime2.log(`[EVM WRITE] Polygon → CollateralEscrow.releaseOnSettlement(${user}, ..., ${outcome})`);
       const polygonTx = releaseCollateralOnPolygon(runtime2, user, mappedTokenId, outcome);
-      runtime2.log(`[SETTLEMENT] releaseCollateralOnPolygon user=${user} txHash=${polygonTx}`);
+      runtime2.log(`[TX]        ✓ ${polygonTx}`);
     }
-    runtime2.log("[SETTLEMENT] Settlement processing complete");
+    runtime2.log("[SETTLEMENT] ─────────────────────────────────────");
+    runtime2.log("[SETTLEMENT] ✅ Final settlement complete");
+    runtime2.log("[SETTLEMENT] ─────────────────────────────────────");
     return "Settlement complete";
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    runtime2.log(`[ERROR] settleLoan: ${msg}`);
+    runtime2.log(`[ERROR] settlePosition: ${msg}`);
     throw err;
   }
 };
-var questionResolvedSignature = "QuestionResolved(bytes32,int256,uint256[])";
+var PRIVATE_VAULT_API = "https://convergence2026-token-api.cldev.cloud";
+var EARLY_EXIT_ABI = parseAbi([
+  "event EarlyExitExecuted(address indexed user, uint256 indexed tokenId, uint256 payout)"
+]);
+var SETTLEMENT_VAULT_ABI = parseAbi([
+  "function getShieldedAddress(address user, uint256 tokenId) view returns (address)"
+]);
+var callPrivateTransfer = (sendRequester, args) => {
+  const resp = sendRequester.sendRequest({
+    request: {
+      url: `${PRIVATE_VAULT_API}/private-transfer`,
+      method: "POST",
+      multiHeaders: {
+        "Content-Type": { values: ["application/json"] }
+      },
+      bodyString: JSON.stringify({
+        recipient: args.shieldedAddress,
+        token: "{{.vaultToken}}",
+        amount: args.payout,
+        flags: ["hide-sender"],
+        timestamp: args.timestamp,
+        operatorKey: "{{.vaultOperatorKey}}"
+      })
+    },
+    vaultDonSecrets: [
+      { key: "vaultOperatorKey", owner: args.tenderlyApiOwner },
+      { key: "vaultToken", owner: args.tenderlyApiOwner }
+    ],
+    encryptOutput: false
+  }).result();
+  if (!ok(resp)) {
+    throw new Error(`Convergence private-transfer failed (${resp.statusCode}): ` + new TextDecoder().decode(resp.body));
+  }
+  const data = JSON.parse(new TextDecoder().decode(resp.body));
+  if (data.error)
+    throw new Error(`Convergence API error: ${data.error}`);
+  return {
+    transactionId: String(data.transaction_id ?? "unknown"),
+    success: true
+  };
+};
+var privatePayout = async (runtime2, log) => {
+  try {
+    runtime2.log("[PRIVATE PAYOUT] ─────────────────────────────────────");
+    runtime2.log("[PRIVATE PAYOUT] EarlyExitExecuted detected on Base");
+    const topics = log.topics.map((t) => bytesToHex(t));
+    const decoded = decodeEventLog({
+      abi: EARLY_EXIT_ABI,
+      data: bytesToHex(log.data),
+      topics
+    });
+    const user = decoded.args.user;
+    const tokenId = decoded.args.tokenId;
+    const payout = decoded.args.payout;
+    runtime2.log(`[PRIVATE PAYOUT] user:    ${user.slice(0, 8)}...`);
+    runtime2.log(`[PRIVATE PAYOUT] tokenId: ${tokenId.toString().slice(0, 20)}...`);
+    const baseNetwork = getNetwork({
+      chainFamily: "evm",
+      chainSelectorName: runtime2.config.base.chainSelectorName,
+      isTestnet: runtime2.config.base.isTestnet || false
+    });
+    if (!baseNetwork) {
+      throw new Error(`Base network not found: ${runtime2.config.base.chainSelectorName}`);
+    }
+    const evmClient = new cre.capabilities.EVMClient(baseNetwork.chainSelector.selector);
+    const callData = encodeFunctionData({
+      abi: SETTLEMENT_VAULT_ABI,
+      functionName: "getShieldedAddress",
+      args: [user, tokenId]
+    });
+    const callResult = evmClient.callContract(runtime2, {
+      call: {
+        to: hexToBase64(runtime2.config.base.vaultAddress),
+        data: hexToBase64(callData)
+      }
+    }).result();
+    const shieldedAddress = decodeFunctionResult({
+      abi: SETTLEMENT_VAULT_ABI,
+      functionName: "getShieldedAddress",
+      data: bytesToHex(callResult.data)
+    });
+    if (!shieldedAddress || shieldedAddress === "0x0000000000000000000000000000000000000000") {
+      runtime2.log("[PRIVATE PAYOUT] No shielded address registered — skipping private transfer");
+      runtime2.log("[PRIVATE PAYOUT] (User did not opt into private payout at deposit time)");
+      return "Skipped — no shielded address";
+    }
+    runtime2.log("[PRIVATE PAYOUT] Shielded address: [sealed in enclave]");
+    runtime2.log("[PRIVATE PAYOUT] Confidential HTTP: posting private-transfer (credentials + recipient sealed)...");
+    const confClient = new ClientCapability2;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const result = confClient.sendRequest(runtime2, callPrivateTransfer, consensusIdenticalAggregation())({
+      shieldedAddress,
+      payout: payout.toString(),
+      timestamp,
+      tenderlyApiOwner: ""
+    }).result();
+    runtime2.log("[PRIVATE PAYOUT] ─────────────────────────────────────");
+    runtime2.log("[PRIVATE PAYOUT] ✅ Private transfer complete");
+    runtime2.log(`[PRIVATE PAYOUT] tx: ${result.transactionId}`);
+    runtime2.log("[PRIVATE PAYOUT] (amount and recipient are private — no on-chain trace)");
+    runtime2.log("[PRIVATE PAYOUT] ─────────────────────────────────────");
+    return `Private payout complete: txId=${result.transactionId}`;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    runtime2.log(`[ERROR] privatePayout: ${msg}`);
+    throw err;
+  }
+};
+var QUESTION_RESOLVED_SIG = "QuestionResolved(bytes32,int256,uint256[])";
+var EARLY_EXIT_EXECUTED_SIG = "EarlyExitExecuted(address,uint256,uint256)";
 var initWorkflow = (config2) => {
   const cronTrigger = new cre.capabilities.CronCapability;
   const polygonNetwork = getNetwork({
@@ -31152,15 +31133,30 @@ var initWorkflow = (config2) => {
   if (!polygonNetwork) {
     throw new Error(`Polygon network not found: ${config2.polygon.chainSelectorName}`);
   }
+  const baseNetwork = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: config2.base.chainSelectorName,
+    isTestnet: config2.base.isTestnet || false
+  });
+  if (!baseNetwork) {
+    throw new Error(`Base network not found: ${config2.base.chainSelectorName}`);
+  }
   const polygonEVM = new cre.capabilities.EVMClient(polygonNetwork.chainSelector.selector);
-  const questionResolvedHash = keccak256(toBytes(questionResolvedSignature));
+  const baseEVM = new cre.capabilities.EVMClient(baseNetwork.chainSelector.selector);
+  const questionResolvedHash = keccak256(toBytes(QUESTION_RESOLVED_SIG));
+  const earlyExitExecutedHash = keccak256(toBytes(EARLY_EXIT_EXECUTED_SIG));
   return [
     cre.handler(cronTrigger.trigger({ schedule: "*/12 * * * * *" }), monitorLiquidity),
     cre.handler(polygonEVM.logTrigger({
       addresses: [hexToBase64(config2.polygon.umaCtfAdapterAddress)],
       topics: [{ values: [hexToBase64(questionResolvedHash)] }],
       confidence: "CONFIDENCE_LEVEL_FINALIZED"
-    }), settleLoan)
+    }), settlePosition),
+    cre.handler(baseEVM.logTrigger({
+      addresses: [hexToBase64(config2.base.vaultAddress)],
+      topics: [{ values: [hexToBase64(earlyExitExecutedHash)] }],
+      confidence: "CONFIDENCE_LEVEL_FINALIZED"
+    }), privatePayout)
   ];
 };
 async function main() {

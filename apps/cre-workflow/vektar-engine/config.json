@@ -3,16 +3,15 @@
     "chainSelectorName": "polygon-testnet-amoy",
     "isTestnet": true,
     "escrowAddress": "0x3C7F985311E143dCe388368c0657F1CE47422Cb3",
-    "umaOracleAddress": "0x9923D42eF695B5dd9911D05Ac944d4cAca3c4EAB",
-    "umaCtfAdapterAddress": "0xCB1822859cEF82Cd2Eb4E6276C7914e3eF3a21c",
+    "umaOracleAddress": "0xd8866E76441df243fc98B892362Fc6264dC3ca80",
+    "umaCtfAdapterAddress": "0x82495884712C4a4520eB4Bad0aB9c9F912B3edB0",
     "gasLimit": "500000"
   },
   "base": {
     "chainSelectorName": "ethereum-testnet-sepolia-base-1",
     "isTestnet": true,
     "vaultAddress": "0x0000000000000000000000000000000000000001",
-    "gasLimit": "1000000",
-    "rpcUrl": ""
+    "gasLimit": "1000000"
   },
   "polymarket": {
     "apiUrl": "https://clob.polymarket.com",
@@ -27,9 +26,9 @@
   },
   "activeMarkets": [
     {
-      "tokenId": "21742633143463906290569050155826241533067272736897614950488156847949938836455",
-      "noTokenId": "57978026665779402857793752682895021696756924765968538048777073819695614893779",
-      "spotPrice": 0.75
+      "tokenId": "56078938060096976448086754249497300447360333783952000147427828224794011030104",
+      "noTokenId": "11291662904897713174667903388388696640643610556195928998276904135282270136756",
+      "spotPrice": 0.31
     }
   ],
   "watchedUsers": [],

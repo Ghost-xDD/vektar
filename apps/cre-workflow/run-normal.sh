@@ -1,11 +1,9 @@
 #!/bin/bash
-# Run with REAL Polymarket data (production mode)
+# Run one settlement oracle cycle with real Polymarket order book data
 
 set -e
-
 cd "$(dirname "$0")"
 
-# Load environment variables
 if [ -f .env ]; then
   set -a && source .env && set +a
 fi
@@ -15,13 +13,16 @@ if [ -z "$CRE_ETH_PRIVATE_KEY" ]; then
   exit 1
 fi
 
-# Ensure config is set to normal (in case it was changed)
 jq '.demo.scenario = "normal"' vektar-engine/config.json > vektar-engine/config.json.tmp && \
   mv vektar-engine/config.json.tmp vektar-engine/config.json
 
 echo "=========================================="
-echo "📊 Running with REAL Polymarket data"
+echo "📊 Settlement Oracle — Normal Market"
 echo "=========================================="
+echo ""
+echo "Fetching live Polymarket order book..."
+echo "VWAP + safety margin → settlementValueUSDC"
+echo "Writing signed report to SettlementVault on Base"
 echo ""
 
 cre workflow simulate vektar-engine \
