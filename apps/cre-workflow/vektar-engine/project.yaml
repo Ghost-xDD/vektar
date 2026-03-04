@@ -1,0 +1,26 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS — Vektar Settlement Oracle Engine
+# ==========================================================================
+# During local-simulation, RPC URLs here override the default public endpoints.
+# Both chains point at Tenderly Virtual TestNets (mainnet forks) so EVM log
+# triggers and writeReport() calls hit our deployed SettlementVault /
+# CollateralEscrow contracts.
+#
+# polygon-mainnet  → Polygon mainnet fork (CollateralEscrow deployed)
+# ethereum-mainnet-base-1 → Base mainnet fork (SettlementVault deployed)
+
+local-simulation:
+  rpcs:
+    - chain-name: polygon-mainnet
+      url: https://virtual.polygon.eu.rpc.tenderly.co/4ad68571-6a73-406b-ad62-a169a4593612
+    - chain-name: ethereum-mainnet-base-1
+      url: https://virtual.base.eu.rpc.tenderly.co/2e625465-6c0e-4577-b01f-790eb8000996
+
+staging:
+  cre-cli:
+    don-family: "zone-a"
+  rpcs:
+    - chain-name: polygon-mainnet
+      url: https://virtual.polygon.eu.rpc.tenderly.co/4ad68571-6a73-406b-ad62-a169a4593612
+    - chain-name: ethereum-mainnet-base-1
+      url: https://virtual.base.eu.rpc.tenderly.co/2e625465-6c0e-4577-b01f-790eb8000996

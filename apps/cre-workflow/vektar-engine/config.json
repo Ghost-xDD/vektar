@@ -1,16 +1,16 @@
 {
   "polygon": {
-    "chainSelectorName": "polygon-testnet-amoy",
-    "isTestnet": true,
-    "escrowAddress": "0x3C7F985311E143dCe388368c0657F1CE47422Cb3",
-    "umaOracleAddress": "0xd8866E76441df243fc98B892362Fc6264dC3ca80",
-    "umaCtfAdapterAddress": "0x82495884712C4a4520eB4Bad0aB9c9F912B3edB0",
+    "chainSelectorName": "polygon-mainnet",
+    "isTestnet": false,
+    "escrowAddress": "0x194E19AF9bfe69aDA8de9df3eAfAebbe60d0bC74",
+    "umaOracleAddress": "0xBb1A8db2D4350976a11cdfA60A1d43f97710Da49",
+    "umaCtfAdapterAddress": "0x6A9D222616C90FcA5754cd1333cFD9b7fb6a4F74",
     "gasLimit": "500000"
   },
   "base": {
-    "chainSelectorName": "ethereum-testnet-sepolia-base-1",
-    "isTestnet": true,
-    "vaultAddress": "0x0000000000000000000000000000000000000001",
+    "chainSelectorName": "ethereum-mainnet-base-1",
+    "isTestnet": false,
+    "vaultAddress": "0xbc5502C2086235E1A1Ab7B5A397cE4B327035e97",
     "gasLimit": "1000000"
   },
   "polymarket": {
@@ -31,8 +31,12 @@
       "spotPrice": 0.31
     }
   ],
-  "watchedUsers": [],
-  "assertionToTokenMap": {},
+  "watchedUsers": [
+    "0x311e26702ABa231c321C633d1ff6ecB4445f2308"
+  ],
+  "assertionToTokenMap": {
+    "0x7b5cda8550767ca9c93b25352e94fb53d17f8f54468a112320b7013ff4a3424e": "56078938060096976448086754249497300447360333783952000147427828224794011030104"
+  },
   "demo": {
     "scenario": "normal"
   }

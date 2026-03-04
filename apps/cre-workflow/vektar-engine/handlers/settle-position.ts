@@ -6,8 +6,10 @@ import { decodeEventLog, parseAbi } from "viem";
 import type { Config } from "../types";
 import { settlePositionOnBase, releaseCollateralOnPolygon } from "../integrations/settlement-oracle-writer";
 
+// Matches the real Polymarket UMA CTF Adapter v2 on Polygon mainnet:
+// both questionId and resolution are indexed (confirmed from mainnet event logs)
 const umaEventAbi = parseAbi([
-  "event QuestionResolved(bytes32 indexed questionID, int256 settledPrice, uint256[] payouts)"
+  "event QuestionResolved(bytes32 indexed questionID, int256 indexed settledPrice, uint256[] payouts)"
 ]);
 
 /**

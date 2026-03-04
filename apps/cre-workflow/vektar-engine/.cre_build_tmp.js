@@ -30958,7 +30958,7 @@ var monitorLiquidity = async (runtime2) => {
   }
 };
 var umaEventAbi = parseAbi([
-  "event QuestionResolved(bytes32 indexed questionID, int256 settledPrice, uint256[] payouts)"
+  "event QuestionResolved(bytes32 indexed questionID, int256 indexed settledPrice, uint256[] payouts)"
 ]);
 var settlePosition = (runtime2, log) => {
   try {

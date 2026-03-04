@@ -126,13 +126,16 @@ contract SettlementVault {
 
     /// @notice Called by CRE after verifying the user deposited shares into CollateralEscrow on Polygon.
     ///         Registers the position on Base so earlyExit() can be called.
+    /// @dev DEMO ONLY: access control removed for direct testing on Tenderly fork.
+    ///      Production must restore `onlyCREForwarder` — CRE verifies the Polygon
+    ///      collateral deposit before calling this, preventing fake share registration.
     function registerPosition(
         address user,
         uint256 tokenId,
         uint256 shares,
         address polygonAddress,
         address shieldedAddress
-    ) external onlyCREForwarder {
+    ) external {
         Position storage pos = positions[user][tokenId];
         pos.tokenId = tokenId;
         pos.shares += shares;
