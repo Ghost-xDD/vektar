@@ -2,30 +2,25 @@
 pragma solidity ^0.8.24;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {HorizonVault} from "../src/base/HorizonVault.sol";
+import {SettlementVault} from "../src/base/SettlementVault.sol";
 
-/**
- * @title DeployBase
- * @notice Deployment script for Base Sepolia testnet
- * @dev Run with: forge script script/DeployBase.s.sol --rpc-url base_sepolia --broadcast --verify
- */
+/// @title DeployBase
+/// @notice Deployment script for SettlementVault on Tenderly Base mainnet fork (or Base Sepolia)
+/// @dev Run with: forge script script/DeployBase.s.sol --rpc-url $BASE_TENDERLY_RPC --broadcast
 contract DeployBase is Script {
-    // CRE Forwarder address on Base Sepolia
-    // TODO: Replace with actual CRE forwarder after workflow deployment
-    // For testing, we'll use the deployer address initially
-    address constant CRE_FORWARDER_PLACEHOLDER = address(0); // Will use deployer in run()
-    
+    // Base mainnet USDC (also present on Tenderly Base mainnet fork)
+    address constant USDC_BASE_MAINNET = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+
     function run() external {
-        // Read deployer private key from environment
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
-        
+
         console2.log("=========================================");
-        console2.log("Deploying HorizonVault to Base Sepolia");
+        console2.log("Deploying SettlementVault");
         console2.log("=========================================");
         console2.log("Deployer:", deployer);
-        
-        // Get CRE forwarder address (use deployer if not set)
+
+        // CRE Forwarder — same address on both testnets and mainnet forks
         address creForwarder;
         try vm.envAddress("CRE_FORWARDER_ADDRESS") returns (address addr) {
             creForwarder = addr;
@@ -34,51 +29,35 @@ contract DeployBase is Script {
             creForwarder = deployer;
         }
         console2.log("CRE Forwarder:", creForwarder);
-        
-        // Get MAX_LTV_INCREASE_PER_UPDATE (default: 10000 for demo)
-        uint256 maxLtvIncrease;
-        try vm.envUint("MAX_LTV_INCREASE_PER_UPDATE") returns (uint256 val) {
-            maxLtvIncrease = val;
+
+        // USDC — use mainnet address (present on Tenderly fork), override for testnets
+        address usdc;
+        try vm.envAddress("USDC_ADDRESS") returns (address addr) {
+            usdc = addr;
         } catch {
-            maxLtvIncrease = 10000; // Default: 100% (instant updates for demo)
-            console2.log("MAX_LTV_INCREASE_PER_UPDATE not set, using default: 10000 bps (100%, DEMO MODE)");
+            usdc = USDC_BASE_MAINNET;
+            console2.log("USDC_ADDRESS not set, using Base mainnet USDC");
         }
-        console2.log("Max LTV Increase Per Update: %s bps", maxLtvIncrease);
+        console2.log("USDC:", usdc);
         console2.log("");
-        
+
         vm.startBroadcast(deployerPrivateKey);
-        
-        // Deploy HorizonVault
-        HorizonVault vault = new HorizonVault(creForwarder, maxLtvIncrease);
-        
+
+        SettlementVault vault = new SettlementVault(creForwarder, usdc);
+
         vm.stopBroadcast();
-        
+
         console2.log("=========================================");
         console2.log("Deployment Complete!");
         console2.log("=========================================");
-        console2.log("HorizonVault:", address(vault));
-        console2.log("");
-        console2.log("Contract Configuration:");
-        console2.log("- MAX_LTV_INCREASE_PER_UPDATE: %s bps", vault.MAX_LTV_INCREASE_PER_UPDATE());
-        if (vault.MAX_LTV_INCREASE_PER_UPDATE() == 10000) {
-            console2.log("  (100%% - DEMO MODE: instant updates)");
-        } else if (vault.MAX_LTV_INCREASE_PER_UPDATE() <= 1000) {
-            console2.log("  (Production mode: gradual updates)");
-        }
-        console2.log("- LIQUIDATION_BONUS: %s bps (5%%)", vault.LIQUIDATION_BONUS());
-        console2.log("- LIQUIDATION_GRACE_PERIOD: %s seconds", vault.LIQUIDATION_GRACE_PERIOD());
+        console2.log("SettlementVault:", address(vault));
+        console2.log("CRE_FORWARDER:  ", vault.CRE_FORWARDER());
+        console2.log("USDC:           ", vault.USDC());
         console2.log("");
         console2.log("Next Steps:");
-        console2.log("1. Update config.json with:");
-        console2.log('   "base.vaultAddress": "%s"', address(vault));
-        console2.log("2. If using deployer as CRE forwarder, update after workflow deployment");
-        console2.log("3. Verify contract on BaseScan if --verify failed");
-        console2.log("");
-        console2.log("Verification command:");
-        console2.log("forge verify-contract %s HorizonVault --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,uint256)\" %s %s)", 
-            address(vault),
-            creForwarder,
-            maxLtvIncrease
-        );
+        console2.log("1. Update config.json: base.vaultAddress =", address(vault));
+        console2.log("2. Set SETTLEMENT_VAULT_ADDRESS in .env");
+        console2.log("3. Mint USDC to SettlementVault via Tenderly admin RPC:");
+        console2.log("   See IMPLEMENTATION.md \u00a7Phase 3 for the full cast command");
     }
 }

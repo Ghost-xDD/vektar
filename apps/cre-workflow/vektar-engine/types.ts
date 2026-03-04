@@ -23,6 +23,8 @@ const baseConfigSchema = z.object({
   isTestnet: z.boolean().optional(),
   vaultAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address"),
   gasLimit: z.string().regex(/^\d+$/).refine(val => Number(val) > 0),
+  // Optional: used by Handler 3 to read getShieldedAddress() via eth_call
+  rpcUrl: z.string().url().optional(),
 });
 
 // Polymarket API configuration

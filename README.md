@@ -1,17 +1,18 @@
 # Vektar
 
-**Settlement oracle and early exit infrastructure for prediction markets.** Built on [Chainlink CRE](https://docs.chain.link/cre).
+**The settlement oracle for prediction markets.** Built on [Chainlink CRE](https://docs.chain.link/cre).
 
 $20B+ sits in prediction markets. Protocols want to build on top — lending, leverage, options. Users want to exit before binary resolution. Both hit the same wall: there is no on-chain source for what a prediction market position can actually be **settled for**. Not what it's priced at. What it clears for, right now, against real order book depth.
 
 ```
 getPrice("ETH/USD")         → $3,241   ✓  (Chainlink)
 isMarketResolved(id)        → true     ✓  (UMA)
-getSettlementValue(tokenId) → ???      ✗  (nobody)  ← the oracle  — any protocol consumes it
-earlyExit(tokenId)          → ???      ✗  (nobody)  ← the app     — users settle now, not at resolution
+getSettlementValue(tokenId) → ???      ✗  (nobody)  ← this is what Vektar builds
 ```
 
-Vektar builds both. Every 12 seconds, a CRE workflow fetches the live Polymarket order book with BFT consensus, simulates the real exit cost via VWAP, and publishes a cryptographically-signed settlement value on-chain. Any protocol can consume the oracle. Users can call `earlyExit()` to receive the settlement value in USDC immediately — position exits privately, no waiting for binary resolution.
+Every 12 seconds, a CRE workflow fetches the live Polymarket order book with BFT consensus, simulates the real exit cost via VWAP, and publishes a cryptographically-signed settlement value on-chain. Any protocol can read `getSettlementValue(tokenId)` — it is a public oracle, like Chainlink price feeds but for prediction market exit liquidity.
+
+We also built the first application on top of it: **early exit**. Users call `earlyExit()` to receive the oracle's settlement value in USDC immediately — position exits privately, no waiting for binary resolution. This is not the product. This is proof the oracle works.
 
 ---
 
