@@ -109,13 +109,13 @@ async function main() {
       blockNumber: Number(log.blockNumber),
       txHash: log.transactionHash,
       logIndex: Number(log.logIndex), // block-wide log index
-      txEventIndex: Number(log.transactionLogIndex ?? 0), // index within transaction receipt logs
+      txEventIndex: Number(log.logIndex ?? 0), // index within transaction receipt logs
       assertionId,
       assertionCaller,
       settlementResolution,
       assertedTruthfully,
       settleCaller,
-      suggestedTrigger: `--evm-tx-hash ${log.transactionHash} --evm-event-index ${Number(log.transactionLogIndex ?? 0)}`,
+      suggestedTrigger: `--evm-tx-hash ${log.transactionHash} --evm-event-index ${Number(log.logIndex ?? 0)}`,
     };
   });
 
