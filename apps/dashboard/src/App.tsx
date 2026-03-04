@@ -6,40 +6,71 @@ import { PositionCard } from './components/PositionCard';
 import { ActivityFeed } from './components/ActivityFeed';
 import { NetworkBadge } from './components/NetworkBadge';
 import { MetricCard } from './components/MetricCard';
+import { ScenarioToggle } from './components/ScenarioToggle';
 import { INITIAL_MARKET, INITIAL_POSITION } from './lib/mock-data';
 import { useMarketLTV } from './hooks/useMarketLTV';
 import { usePosition } from './hooks/usePosition';
 import { useOrderBook, type OrderBookLevel } from './hooks/useOrderBook';
-import { useActivityEvents, type ActivityEvent } from './hooks/useActivityEvents';
+import {
+  useActivityEvents,
+  type ActivityEvent,
+} from './hooks/useActivityEvents';
 
 export default function App() {
   // Real blockchain data
-  const { data: ltvData, isLoading: ltvLoading, error: ltvError } = useMarketLTV();
+  const {
+    data: ltvData,
+    isLoading: ltvLoading,
+    error: ltvError,
+  } = useMarketLTV();
   const { data: positionData, isLoading: positionLoading } = usePosition();
   const { data: orderBookData, isLoading: orderBookLoading } = useOrderBook();
   const { data: eventsData = [] as ActivityEvent[] } = useActivityEvents();
-  
+
   // Use mock data for static display values
   const market = INITIAL_MARKET;
   const position = INITIAL_POSITION;
-  
+
   // Calculate real-time values
   const hasRealData = !ltvLoading && !!ltvData;
   const realSpotPrice = orderBookData?.bids?.[0]?.price || market.spotPrice;
-  const realShares = positionData ? Number(positionData.collateralAmount) / 1e18 : position.collateralShares;
-  const realDebt = positionData ? Number(positionData.debtAmount) / 1e6 : position.debtUsd;
+  const realShares = positionData
+    ? Number(positionData.collateralAmount) / 1e18
+    : position.collateralShares;
+  const realDebt = positionData
+    ? Number(positionData.debtAmount) / 1e6
+    : position.debtUsd;
   const collateralValue = realShares * realSpotPrice;
-  
+
   // LTV-based calculations
   const dynamicLtvPercent = ltvData?.dynamicLtvPercent || 0;
   const maxBorrowDynamic = collateralValue * (dynamicLtvPercent / 100);
   const maxBorrowStatic = collateralValue * 0.75;
-  
+
   // Calculate health factor correctly using real spot price
   // Health Factor = (collateralValue × dynamicLTV) / debt
   // The contract's calculateHealthFactor assumes $1.00/share (wrong!)
   // We override it here with correct calculation using real spot price
   const realHealthFactor = realDebt > 0 ? maxBorrowDynamic / realDebt : 999;
+
+  // Settled = on-chain: debt cleared (Base) and collateral released (Polygon). All from chain.
+  const isSettled =
+    !!positionData &&
+    positionData.debtAmount === 0n &&
+    positionData.lockedCollateral === 0n;
+  const positionStatus = isSettled
+    ? 'settled'
+    : positionData?.liquidatable
+      ? 'liquidatable'
+      : 'active';
+
+  // When settled, collateral is released so we show 0 (from escrow locked balance). Otherwise vault + spot.
+  const displayShares = positionData
+    ? isSettled
+      ? Number(positionData.lockedCollateral) / 1e18
+      : Number(positionData.collateralAmount) / 1e18
+    : position.collateralShares;
+  const displayCollateralValue = displayShares * realSpotPrice;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -60,16 +91,30 @@ export default function App() {
               <div>
                 <h1 className="text-sm font-bold tracking-tight">
                   <span className="text-white">VEKTAR</span>
-                  <span className="text-white/30 font-normal ml-1.5">Dynamic LTV Engine</span>
+                  <span className="text-white/30 font-normal ml-1.5">
+                    Dynamic LTV Engine
+                  </span>
                 </h1>
               </div>
             </div>
 
             {/* Network Status */}
             <div className="hidden sm:flex items-center gap-2">
-              <NetworkBadge name="Base Sepolia" color="#0052ff" isConnected={hasRealData} />
-              <NetworkBadge name="Polygon Amoy" color="#7b3fe4" isConnected={!!positionData} />
-              <NetworkBadge name="Polymarket CLOB" color="#22d3ee" isConnected={!!orderBookData} />
+              <NetworkBadge
+                name="Base Sepolia"
+                color="#0052ff"
+                isConnected={hasRealData}
+              />
+              <NetworkBadge
+                name="Polygon Amoy"
+                color="#7b3fe4"
+                isConnected={!!positionData}
+              />
+              <NetworkBadge
+                name="Polymarket CLOB"
+                color="#22d3ee"
+                isConnected={!!orderBookData}
+              />
             </div>
 
             {/* Status indicator */}
@@ -96,6 +141,7 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* No large "Settled" banner — status lives in the position card only */}
         {/* Market Banner */}
         <div className="relative overflow-hidden rounded-xl border border-border bg-surface p-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -104,21 +150,36 @@ export default function App() {
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-accent-bright bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
                   Polymarket
                 </span>
-                <span className="text-[10px] text-white/30">{market.volume} volume</span>
+                <span className="text-[10px] text-white/30">
+                  {market.volume} volume
+                </span>
               </div>
               <h2 className="text-lg sm:text-xl font-semibold text-white/90 leading-snug">
                 {market.questionTitle}
               </h2>
               <div className="flex items-center gap-4 mt-2 text-xs text-white/40">
-                <span>Spot: <span className="text-white/70 font-mono">
-                  ${realSpotPrice.toFixed(2)}
-                </span></span>
-                <span>Shares: <span className="text-white/70 font-mono">
-                  {realShares.toLocaleString()}
-                </span></span>
-                <span>Collateral: <span className="text-white/70 font-mono">
-                  ${collateralValue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}
-                </span></span>
+                <span>
+                  Spot:{' '}
+                  <span className="text-white/70 font-mono">
+                    ${realSpotPrice.toFixed(2)}
+                  </span>
+                </span>
+                <span>
+                  Shares:{' '}
+                  <span className="text-white/70 font-mono">
+                    {realShares.toLocaleString()}
+                  </span>
+                </span>
+                <span>
+                  Collateral:{' '}
+                  <span className="text-white/70 font-mono">
+                    $
+                    {collateralValue.toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}
+                  </span>
+                </span>
               </div>
             </div>
 
@@ -145,12 +206,16 @@ export default function App() {
           {/* LTV Gauges */}
           <div className="rounded-xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white/70">LTV Comparison</h3>
-              {hasRealData && dynamicLtvPercent > 0 && dynamicLtvPercent < 75 && (
-                <span className="text-[10px] text-yellow-400/80 bg-yellow-400/10 px-2 py-0.5 rounded-full border border-yellow-400/20">
-                  Dynamic {(75 - dynamicLtvPercent).toFixed(1)}% safer
-                </span>
-              )}
+              <h3 className="text-sm font-medium text-white/70">
+                LTV Comparison
+              </h3>
+              {hasRealData &&
+                dynamicLtvPercent > 0 &&
+                dynamicLtvPercent < 75 && (
+                  <span className="text-[10px] text-yellow-400/80 bg-yellow-400/10 px-2 py-0.5 rounded-full border border-yellow-400/20">
+                    Dynamic {(75 - dynamicLtvPercent).toFixed(1)}% safer
+                  </span>
+                )}
             </div>
 
             <div className="flex items-center justify-center gap-6 sm:gap-12">
@@ -169,7 +234,7 @@ export default function App() {
                 isActive={hasRealData}
               />
             </div>
-            
+
             {/* Blockchain connection status */}
             {ltvLoading && (
               <div className="mt-3 text-center text-xs text-white/40">
@@ -191,8 +256,11 @@ export default function App() {
             {!hasRealData && (
               <div className="mt-4 bg-red-500/5 border border-red-500/15 rounded-lg p-3 text-center">
                 <p className="text-xs text-red-400/80">
-                  Static LTV allows <span className="font-mono font-semibold">${maxBorrowStatic.toLocaleString()}</span> borrowing
-                  — real exit liquidity may be far lower
+                  Static LTV allows{' '}
+                  <span className="font-mono font-semibold">
+                    ${maxBorrowStatic.toLocaleString()}
+                  </span>{' '}
+                  borrowing — real exit liquidity may be far lower
                 </p>
               </div>
             )}
@@ -210,16 +278,18 @@ export default function App() {
           {/* Order Book */}
           <div className="rounded-xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white/70">Order Book Depth</h3>
+              <h3 className="text-sm font-medium text-white/70">
+                Order Book Depth
+              </h3>
               {orderBookData && (
                 <span className="text-[10px] text-cyan-400/60 bg-cyan-400/10 px-2 py-0.5 rounded-full border border-cyan-400/20">
                   Live from Polymarket
                 </span>
               )}
             </div>
-            <OrderBookChart 
-              levels={(orderBookData?.bids ?? []) as OrderBookLevel[]} 
-              isActive={!!orderBookData} 
+            <OrderBookChart
+              levels={(orderBookData?.bids ?? []) as OrderBookLevel[]}
+              isActive={!!orderBookData}
             />
             {orderBookLoading && (
               <div className="mt-2 text-center text-xs text-white/40">
@@ -228,7 +298,8 @@ export default function App() {
             )}
             {orderBookData && orderBookData.totalBidDepth !== undefined && (
               <div className="mt-2 text-center text-xs text-cyan-400/60">
-                ✓ ${orderBookData.totalBidDepth.toLocaleString()} total bid depth
+                ✓ ${orderBookData.totalBidDepth.toLocaleString()} total bid
+                depth
               </div>
             )}
           </div>
@@ -238,29 +309,33 @@ export default function App() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             label="Max Borrow (Static)"
-            value={`$${maxBorrowStatic.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            value={`$${maxBorrowStatic.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
             subValue="75% LTV (hardcoded)"
             color="#6b7280"
             isActive={true}
           />
           <MetricCard
             label="Max Borrow (Dynamic)"
-            value={`$${maxBorrowDynamic.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            value={`$${maxBorrowDynamic.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
             subValue={`${dynamicLtvPercent.toFixed(1)}% LTV (live)`}
             color="#6366f1"
             isActive={hasRealData}
           />
           <MetricCard
             label="Total Bid Depth"
-            value={`$${(orderBookData?.totalBidDepth ?? 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
+            value={`$${(orderBookData?.totalBidDepth ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
             subValue={`${(orderBookData?.bids ?? []).length} price levels`}
             color="#22d3ee"
             isActive={!!orderBookData}
           />
           <MetricCard
             label="Current Debt"
-            value={`$${realDebt.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`}
-            subValue={positionData && hasRealData ? `Health: ${realHealthFactor.toFixed(2)}` : 'No position'}
+            value={`$${realDebt.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+            subValue={
+              positionData && hasRealData
+                ? `Health: ${realHealthFactor.toFixed(2)}`
+                : 'No position'
+            }
             color={realHealthFactor > 1 ? '#10b981' : '#ef4444'}
             isActive={!!positionData && hasRealData}
           />
@@ -271,9 +346,9 @@ export default function App() {
           {/* Health + Position */}
           <div className="lg:col-span-1 space-y-6">
             <div className="rounded-xl border border-border bg-surface p-5">
-              <HealthFactor 
-                value={realHealthFactor} 
-                isActive={!!positionData && hasRealData} 
+              <HealthFactor
+                value={realHealthFactor}
+                isActive={!!positionData && hasRealData}
               />
               {positionLoading && (
                 <div className="mt-2 text-center text-xs text-white/40">
@@ -290,16 +365,17 @@ export default function App() {
               <PositionCard
                 position={{
                   user: '0x311e...2308',
-                  collateralShares: realShares,
-                  collateralValueUsd: collateralValue,
+                  collateralShares: displayShares,
+                  collateralValueUsd: displayCollateralValue,
                   debtUsd: realDebt,
                   healthFactor: realHealthFactor,
-                  status: positionData?.liquidatable ? 'liquidatable' : 'active',
-                  polygonAddress: positionData?.polygonAddress ?? '0x518316DA...35517E6',
-                  baseAddress: '0x82495884...B3edB0'
+                  status: positionStatus,
+                  polygonAddress:
+                    positionData?.polygonAddress ?? '0x518316DA...35517E6',
+                  baseAddress: '0x82495884...B3edB0',
                 }}
                 isActive={!!positionData}
-                collateralValueUsd={collateralValue}
+                collateralValueUsd={displayCollateralValue}
               />
             </div>
           </div>
@@ -307,15 +383,19 @@ export default function App() {
           {/* Activity Feed */}
           <div className="lg:col-span-2 rounded-xl border border-border bg-surface p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white/70">Activity Feed</h3>
+              <h3 className="text-sm font-medium text-white/70">
+                Activity Feed
+              </h3>
               {eventsData.length > 0 && (
-                <span className="text-[10px] text-white/30 font-mono">{eventsData.length} events</span>
+                <span className="text-[10px] text-white/30 font-mono">
+                  {eventsData.length} events
+                </span>
               )}
             </div>
             <ActivityFeed events={eventsData} />
             {eventsData.length > 0 && (
               <div className="mt-3 text-center text-xs text-green-400/60">
-                ✓ Live events from Base Sepolia
+                ✓ Live onchain events
               </div>
             )}
             {eventsData.length === 0 && !hasRealData && (
@@ -328,23 +408,39 @@ export default function App() {
 
         {/* Architecture Banner */}
         <div className="rounded-xl border border-border bg-surface p-6 overflow-hidden relative">
-          <h3 className="text-sm font-medium text-white/70 mb-4">Cross-Chain Architecture</h3>
+          <h3 className="text-sm font-medium text-white/70 mb-4">
+            Cross-Chain Architecture
+          </h3>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-0">
             {/* Polygon */}
             <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-[#7b3fe4]/5 border border-[#7b3fe4]/15 min-w-[180px]">
               <div className="w-8 h-8 rounded-full bg-[#7b3fe4]/20 flex items-center justify-center">
                 <div className="w-4 h-4 rounded-full bg-[#7b3fe4]" />
               </div>
-              <span className="text-xs font-semibold text-[#7b3fe4]">Polygon Amoy</span>
-              <span className="text-[10px] text-white/40">Collateral Escrow</span>
-              <span className="text-[10px] text-white/30 font-mono">CTF ERC-1155 Shares</span>
+              <span className="text-xs font-semibold text-[#7b3fe4]">
+                Polygon Amoy
+              </span>
+              <span className="text-[10px] text-white/40">
+                Collateral Escrow
+              </span>
+              <span className="text-[10px] text-white/30 font-mono">
+                CTF ERC-1155 Shares
+              </span>
             </div>
 
             {/* Arrow */}
             <div className="hidden sm:flex flex-col items-center gap-1 px-4">
               <div className="text-[10px] text-white/30">EVM Read</div>
               <div className="w-16 h-px bg-gradient-to-r from-[#7b3fe4]/40 to-accent/40" />
-              <svg className="w-4 h-4 text-white/20 rotate-90 sm:rotate-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg
+                className="w-4 h-4 text-white/20 rotate-90 sm:rotate-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </div>
 
             {/* CRE */}
@@ -352,16 +448,28 @@ export default function App() {
               <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-accent-bright" />
               </div>
-              <span className="text-xs font-semibold text-accent-bright">CRE Workflow</span>
+              <span className="text-xs font-semibold text-accent-bright">
+                CRE Workflow
+              </span>
               <span className="text-[10px] text-white/40">BFT Consensus</span>
-              <span className="text-[10px] text-white/30 font-mono">Dual Triggers (Cron + Event)</span>
+              <span className="text-[10px] text-white/30 font-mono">
+                Dual Triggers (Cron + Event)
+              </span>
             </div>
 
             {/* Arrow */}
             <div className="hidden sm:flex flex-col items-center gap-1 px-4">
               <div className="text-[10px] text-white/30">EVM Write</div>
               <div className="w-16 h-px bg-gradient-to-r from-accent/40 to-[#0052ff]/40" />
-              <svg className="w-4 h-4 text-white/20 rotate-90 sm:rotate-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg
+                className="w-4 h-4 text-white/20 rotate-90 sm:rotate-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </div>
 
             {/* Base */}
@@ -369,9 +477,13 @@ export default function App() {
               <div className="w-8 h-8 rounded-full bg-[#0052ff]/20 flex items-center justify-center">
                 <div className="w-4 h-4 rounded-full bg-[#0052ff]" />
               </div>
-              <span className="text-xs font-semibold text-[#0052ff]">Base Sepolia</span>
+              <span className="text-xs font-semibold text-[#0052ff]">
+                Base Sepolia
+              </span>
               <span className="text-[10px] text-white/40">HorizonVault</span>
-              <span className="text-[10px] text-white/30 font-mono">LTV + Liquidation + Settlement</span>
+              <span className="text-[10px] text-white/30 font-mono">
+                LTV + Liquidation + Settlement
+              </span>
             </div>
           </div>
 
@@ -381,7 +493,10 @@ export default function App() {
 
         {/* Footer */}
         <footer className="text-center py-6 text-xs text-white/20 space-y-1">
-          <p>Event Horizon — Prediction Market Derivative Settlement Infrastructure</p>
+          <p>
+            Event Horizon — Prediction Market Derivative Settlement
+            Infrastructure
+          </p>
           <p>Built with CRE (Chainlink Runtime Environment) | Team Cyph</p>
         </footer>
       </main>

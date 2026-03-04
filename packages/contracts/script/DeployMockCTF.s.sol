@@ -6,7 +6,7 @@ import {MockCTF} from "../src/polygon/MockCTF.sol";
 
 /// @notice Deploy MockCTF (mock Polymarket ERC-1155) to Polygon Amoy
 contract DeployMockCTF is Script {
-    function run() external {
+    function run() external returns (address mockCTF) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
@@ -19,8 +19,9 @@ contract DeployMockCTF is Script {
         vm.startBroadcast(deployerPrivateKey);
         
         // Deploy MockCTF
-        MockCTF mockCTF = new MockCTF();
-        console2.log("MockCTF deployed at:", address(mockCTF));
+        MockCTF _mockCTF = new MockCTF();
+        mockCTF = address(_mockCTF);
+        console2.log("MockCTF deployed at:", mockCTF);
         
         vm.stopBroadcast();
         
@@ -29,8 +30,11 @@ contract DeployMockCTF is Script {
         console2.log("Deployment Complete!");
         console2.log("==========================================");
         console2.log("");
-        console2.log("MockCTF Address:", address(mockCTF));
+        console2.log("MockCTF Address:", mockCTF);
         console2.log("");
-        console2.log("Next: Run script/MintTestTokens.sh");
+        console2.log("Verification command:");
+        console2.log("forge verify-contract", mockCTF, "MockCTF --chain polygon-amoy");
+        
+        return mockCTF;
     }
 }

@@ -8,12 +8,15 @@ contract HorizonVault {
     /// @notice Function selectors for routing
     bytes4 private constant UPDATE_MARKET_LTV_SELECTOR = 0x2442fe4a; // updateMarketLTV(uint256,uint256,bytes)
     bytes4 private constant MARK_LIQUIDATABLE_SELECTOR = 0x9c26443c; // markLiquidatable(address,uint256,bytes)
+    bytes4 private constant SETTLE_LOAN_SELECTOR = 0x008b0dd5; // settleLoan(address,uint256,uint8,int256,bytes)
     /// @notice CRE forwarder address - only this can update LTV and mark liquidations
     address public immutable CRE_FORWARDER;
     
     /// @notice Maximum LTV increase per CRE update (basis points)
-    /// @dev 200 = 2% max increase per cycle. Prevents spoofing attacks.
-    uint256 public constant MAX_LTV_INCREASE_PER_UPDATE = 200; // 2%
+    /// @dev Configurable via constructor. Recommended values:
+    ///      - Demo: 10000 (100%, instant updates)
+    ///      - Production: 200-1000 (2-10%, prevents spoofing attacks)
+    uint256 public immutable MAX_LTV_INCREASE_PER_UPDATE;
     
     /// @notice Liquidation bonus for liquidators (basis points)
     uint256 public constant LIQUIDATION_BONUS = 500; // 5%
@@ -92,8 +95,14 @@ contract HorizonVault {
     error GracePeriodNotElapsed();
     error InsufficientCollateral();
     
-    constructor(address _creForwarder) {
+    /// @param _creForwarder Chainlink Forwarder address
+    /// @param _maxLtvIncreasePerUpdate Max LTV increase per cycle in basis points (200 = 2%)
+    constructor(address _creForwarder, uint256 _maxLtvIncreasePerUpdate) {
+        require(_creForwarder != address(0), "Invalid forwarder");
+        require(_maxLtvIncreasePerUpdate > 0 && _maxLtvIncreasePerUpdate <= 10000, "Invalid max LTV increase");
+        
         CRE_FORWARDER = _creForwarder;
+        MAX_LTV_INCREASE_PER_UPDATE = _maxLtvIncreasePerUpdate;
     }
     
     modifier onlyCREForwarder() {
@@ -115,6 +124,11 @@ contract HorizonVault {
             // Decode: selector + address user + uint256 tokenId + bytes proof
             (address user, uint256 tokenId, bytes memory proof) = abi.decode(report[4:], (address, uint256, bytes));
             _markLiquidatable(user, tokenId, proof);
+        } else if (selector == SETTLE_LOAN_SELECTOR) {
+            // Decode: selector + address user + uint256 tokenId + uint8 outcome + int256 netSettlement + bytes proof
+            (address user, uint256 tokenId, uint8 outcome, int256 netSettlement, bytes memory proof) =
+                abi.decode(report[4:], (address, uint256, uint8, int256, bytes));
+            _settleLoan(user, tokenId, outcome, netSettlement, proof);
         } else {
             revert("Unknown function selector");
         }
@@ -212,6 +226,16 @@ contract HorizonVault {
         int256 netSettlement,
         bytes calldata proof
     ) external onlyCREForwarder {
+        _settleLoan(user, tokenId, outcome, netSettlement, proof);
+    }
+
+    function _settleLoan(
+        address user,
+        uint256 tokenId,
+        uint8 outcome,
+        int256 netSettlement,
+        bytes memory proof
+    ) internal {
         Position storage pos = positions[user][tokenId];
         
         // Clear position

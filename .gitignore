@@ -17,6 +17,10 @@ out/
 .env
 .env.local
 .env.*.local
+.env.backup
+.env.bak
+*.env.backup
+*.env.bak
 secrets.yaml
 
 # Logs
@@ -52,3 +56,14 @@ lib/
 
 # Bun
 bun.lockb
+IMPLEMENTATION.md
+PIVOT.md
+PRD.md
+README.md
+UI-INTEGRATION.md
+VIDEO-PRODUCTION.md
+
+docs/
+UI-INTEGRATION-CHECKLIST.md
+apps/cre-workflow/DEMO-RECORDING-GUIDE.md
+presentation.md

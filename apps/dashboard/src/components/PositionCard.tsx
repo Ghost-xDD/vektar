@@ -33,9 +33,9 @@ function getStatusConfig(status: Position['status']) {
     case 'settled':
       return {
         label: 'SETTLED',
-        color: '#6366f1',
-        bg: 'rgba(99, 102, 241, 0.1)',
-        border: 'rgba(99, 102, 241, 0.3)',
+        color: '#10b981',
+        bg: 'rgba(16, 185, 129, 0.15)',
+        border: 'rgba(16, 185, 129, 0.35)',
       };
     default:
       return {
@@ -62,7 +62,7 @@ export function PositionCard({
           <span
             className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${
               position.status === 'liquidatable' ? 'animate-pulse' : ''
-            }`}
+            } ${position.status === 'settled' ? 'ring-2 ring-green-400/40' : ''}`}
             style={{
               color: statusConfig.color,
               background: statusConfig.bg,
@@ -74,7 +74,7 @@ export function PositionCard({
         )}
       </div>
 
-      {/* Position details */}
+      {/* Position details: Collateral (Yes shares) + Debt (USDC) with chain labels */}
       <div className="grid grid-cols-2 gap-3">
         {/* Collateral */}
         <div className="bg-white/[0.02] rounded-lg p-3 border border-white/[0.04]">
@@ -90,7 +90,7 @@ export function PositionCard({
             {position.collateralShares.toLocaleString()}
           </p>
           <p className="text-xs text-white/40">
-            Yes shares (${collateralValueUsd.toLocaleString()})
+            Yes shares (${collateralValueUsd.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
           </p>
           <p className="text-[10px] text-[#7b3fe4]/70 mt-1 font-mono">
             Polygon Amoy
@@ -108,7 +108,7 @@ export function PositionCard({
             </span>
           </div>
           <p className="text-lg font-semibold font-mono text-white/90">
-            ${position.debtUsd.toLocaleString()}
+            ${position.debtUsd.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-white/40">USDC borrowed</p>
           <p className="text-[10px] text-[#0052ff]/70 mt-1 font-mono">
@@ -130,31 +130,21 @@ export function PositionCard({
         </div>
       </div>
 
-      {/* Settlement info (shown when settled) */}
+      {/* Settlement info (shown when settled) — all inferred from on-chain: debt=0, locked=0 */}
       {position.status === 'settled' && (
-        <div className="bg-[#6366f1]/5 rounded-lg p-3 border border-[#6366f1]/20 animate-slide-up">
+        <div className="bg-green-500/5 rounded-lg p-3 border border-green-500/20">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
-            <span className="text-xs font-semibold text-[#6366f1]">
-              Settlement Complete
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-xs font-semibold text-green-400">
+              Settlement complete
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-white/40">Outcome</span>
-              <p className="font-mono text-green-400 font-semibold">YES</p>
-            </div>
-            <div>
-              <span className="text-white/40">Net Payout</span>
-              <p className="font-mono text-green-400 font-semibold">+$15,000</p>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-2">
+          <div className="flex flex-wrap gap-3 text-xs">
             <span className="text-[10px] text-green-400/80 flex items-center gap-1">
-              Base Settled <span className="text-green-400">&#10003;</span>
+              Base: debt cleared <span className="text-green-400">&#10003;</span>
             </span>
             <span className="text-[10px] text-green-400/80 flex items-center gap-1">
-              Polygon Released <span className="text-green-400">&#10003;</span>
+              Polygon: collateral released <span className="text-green-400">&#10003;</span>
             </span>
           </div>
         </div>

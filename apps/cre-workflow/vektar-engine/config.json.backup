@@ -2,15 +2,15 @@
   "polygon": {
     "chainSelectorName": "polygon-testnet-amoy",
     "isTestnet": true,
-    "escrowAddress": "0x3C7F985311E143dCe388368c0657F1CE47422Cb3",
+    "escrowAddress": "0xe855FB067C59f06BFF8790615c47eAe2f498073c",
     "umaOracleAddress": "0xd8866E76441df243fc98B892362Fc6264dC3ca80",
-    "umaCtfAdapterAddress": "0x82495884712C4a4520eB4Bad0aB9c9F912B3edB0",
+    "umaCtfAdapterAddress": "0xC6816eBE0a22B1C2de557bEF30852fa8968D2296",
     "gasLimit": "500000"
   },
   "base": {
     "chainSelectorName": "ethereum-testnet-sepolia-base-1",
     "isTestnet": true,
-    "vaultAddress": "0x1b8c4B38C49Cce06B080b9fB0a77Fb0d7634112A",
+    "vaultAddress": "0xe7082f4B7f2320CC5773bF671615783559Bc0e8d",
     "gasLimit": "1000000"
   },
   "polymarket": {
@@ -36,6 +36,6 @@
   ],
   "assertionToTokenMap": {},
   "demo": {
-    "scenario": "crisis"
+    "scenario": "normal"
   }
 }

@@ -119,7 +119,7 @@ export function LtvGauge({ label, value, maxBorrow, isStatic = false, isActive =
             fontWeight="700"
             fontFamily="Inter, sans-serif"
           >
-            {isActive && value > 0 ? `${value.toFixed(1)}%` : '—'}
+            {isActive ? `${value.toFixed(1)}%` : '—'}
           </text>
 
           {/* Label */}
@@ -150,8 +150,8 @@ export function LtvGauge({ label, value, maxBorrow, isStatic = false, isActive =
       {/* Max borrow */}
       <div className="text-center -mt-2">
         <p className="text-xs text-white/40 mb-0.5">Max Borrow</p>
-        <p className="text-lg font-semibold font-mono" style={{ color: isActive && value > 0 ? color : '#4b5563' }}>
-          {isActive && maxBorrow > 0 ? `$${maxBorrow.toLocaleString()}` : '—'}
+        <p className="text-lg font-semibold font-mono" style={{ color: isActive ? color : '#4b5563' }}>
+          {isActive ? `$${maxBorrow.toLocaleString()}` : '—'}
         </p>
       </div>
     </div>

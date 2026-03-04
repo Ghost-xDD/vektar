@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useDemoStore } from '../lib/demo-store';
 
 const YES_TOKEN_ID = import.meta.env.VITE_TOKEN_ID;
 const NO_TOKEN_ID = import.meta.env.VITE_NO_TOKEN_ID;
@@ -31,6 +32,31 @@ interface OrderBookData {
 }
 
 /**
+ * Transform real order book to simulate liquidity scenarios.
+ * Matches the CRE workflow transformation logic.
+ */
+function transformOrderBook(scenario: string, realBids: OrderBookLevel[]): OrderBookLevel[] {
+  if (scenario === 'thin') {
+    // Simulate liquidity drain: reduce all bid sizes by 90%
+    return realBids.map(bid => ({
+      ...bid,
+      size: bid.size * 0.10  // Keep only 10% of original liquidity
+    }));
+  }
+  
+  if (scenario === 'crisis') {
+    // Simulate market panic: 97% liquidity drain + 20% price decay
+    return realBids.map(bid => ({
+      ...bid,
+      price: bid.price * 0.80,  // 20% price decay
+      size: bid.size * 0.03     // Keep only 3% of liquidity
+    }));
+  }
+  
+  return realBids;
+}
+
+/**
  * Merges Yes token bids + No token asks (inverted) to create unified order book.
  * This matches what Polymarket's UI does and what CRE workflow uses.
  * 
@@ -39,8 +65,10 @@ interface OrderBookData {
  * - Most liquidity near spot price comes from inverted No token orders
  */
 export function useOrderBook() {
+  const scenario = useDemoStore((state) => state.scenario);
+  
   return useQuery<OrderBookData>({
-    queryKey: ['orderBook', YES_TOKEN_ID, NO_TOKEN_ID],
+    queryKey: ['orderBook', YES_TOKEN_ID, NO_TOKEN_ID, scenario],
     queryFn: async () => {
       try {
         // Fetch both token books in parallel
@@ -88,18 +116,43 @@ export function useOrderBook() {
         // Sort by price descending (best bids first)
         mergedBids.sort((a, b) => b.price - a.price);
         
+        // Aggregate orders at the same price level (rounded to 2 decimals)
+        const aggregatedBids = new Map<number, number>();
+        mergedBids.forEach((bid) => {
+          const roundedPrice = Math.round(bid.price * 100) / 100;
+          const existing = aggregatedBids.get(roundedPrice) || 0;
+          aggregatedBids.set(roundedPrice, existing + bid.size);
+        });
+        
         // Transform to dashboard format with cumulative totals
         let cumulativeTotal = 0;
-        const bids: OrderBookLevel[] = mergedBids.map((bid) => {
-          const value = bid.price * bid.size;
-          cumulativeTotal += value;
+        let bids: OrderBookLevel[] = Array.from(aggregatedBids.entries())
+          .sort((a, b) => b[0] - a[0]) // Sort by price descending
+          .map(([price, size]) => {
+            const value = price * size;
+            cumulativeTotal += value;
+            
+            return {
+              price,
+              size,
+              total: cumulativeTotal
+            };
+          });
+        
+        // Apply demo transformation if needed
+        if (scenario !== 'normal') {
+          console.log(`[DEMO] Applying ${scenario} transformation to order book`);
+          bids = transformOrderBook(scenario, bids);
           
-          return {
-            price: bid.price,
-            size: bid.size,
-            total: cumulativeTotal
-          };
-        });
+          // Recalculate cumulative totals after transformation
+          let newCumulative = 0;
+          bids = bids.map(bid => {
+            const value = bid.price * bid.size;
+            newCumulative += value;
+            return { ...bid, total: newCumulative };
+          });
+          cumulativeTotal = newCumulative;
+        }
         
         const totalBidDepth = cumulativeTotal;
         

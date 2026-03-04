@@ -2,12 +2,22 @@
 # Continuous CRE Workflow Runner
 # Simulates production DON execution by running workflow every 12 seconds
 # Per Chainlink guidance: simulation with --broadcast is valid for hackathon demos
+#
+# Usage:
+#   ./run-continuous.sh           # Normal mode (real Polymarket data)
+#   ./run-continuous.sh thin      # Thin liquidity scenario
+#   ./run-continuous.sh crisis    # Crisis scenario
 
-set -e
+set -euo pipefail
+
+# Get scenario from argument (default: normal)
+SCENARIO=${1:-normal}
 
 echo "=========================================="
 echo "Vektar CRE Workflow - Continuous Runner"
 echo "=========================================="
+echo ""
+echo "Scenario: $SCENARIO"
 echo ""
 echo "This script simulates a production CRE DON deployment"
 echo "by running the workflow every 12 seconds with --broadcast flag."
@@ -19,8 +29,22 @@ sleep 2
 # Script is already in apps/cre-workflow, so just stay in current directory
 cd "$(dirname "$0")"
 
-# Export the private key for broadcast mode
-export CRE_ETH_PRIVATE_KEY=REDACTED_PRIVATE_KEY
+# Load .env and require CRE private key for broadcast mode
+if [ -f ".env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+: "${CRE_ETH_PRIVATE_KEY:?CRE_ETH_PRIVATE_KEY is required in apps/cre-workflow/.env}"
+
+# Set scenario in config
+jq --arg scenario "$SCENARIO" '.demo.scenario = $scenario' vektar-engine/config.json > vektar-engine/config.json.tmp && \
+  mv vektar-engine/config.json.tmp vektar-engine/config.json
+
+echo "✅ Config set to: $SCENARIO"
+echo ""
 
 CYCLE=0
 START_TIME=$(date +%s)

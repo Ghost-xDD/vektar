@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-02-18T00:00:00Z",
+  "deployer": "0x311e26702ABa231c321C633d1ff6ecB4445f2308",
+  "polygon": {
+    "network": "amoy",
+    "mockCTFAddress": "0x3A7c96FE883cCF4a47cB2f125C6F932C3bf030aE",
+    "escrowAddress": "0x3C7F985311E143dCe388368c0657F1CE47422Cb3"
+  },
+  "base": {
+    "network": "sepolia",
+    "vaultAddress": "0x1b8c4B38C49Cce06B080b9fB0a77Fb0d7634112A",
+    "maxLtvIncrease": 10000
+  },
+  "market": {
+    "tokenId": "56078938060096976448086754249497300447360333783952000147427828224794011030104",
+    "collateralAmount": "20000000000000000000000",
+    "debtAmount": "5000000000"
+  }
+}

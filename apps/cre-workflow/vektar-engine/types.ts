@@ -53,6 +53,11 @@ const marketConfigSchema = z.object({
 
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address");
 
+// Demo configuration (optional)
+const demoConfigSchema = z.object({
+  scenario: z.enum(["normal", "thin", "crisis"]).optional(),
+}).optional();
+
 // Main workflow configuration schema
 export const configSchema = z.object({
   polygon: polygonConfigSchema,
@@ -62,6 +67,7 @@ export const configSchema = z.object({
   activeMarkets: z.array(marketConfigSchema).min(1),
   watchedUsers: z.array(addressSchema),
   assertionToTokenMap: z.record(z.string(), z.string()).optional(),
+  demo: demoConfigSchema,
 });
 
 export type Config = z.infer<typeof configSchema>;

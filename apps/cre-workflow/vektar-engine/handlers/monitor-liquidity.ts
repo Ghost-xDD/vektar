@@ -105,16 +105,24 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
           continue;
         }
 
-        const maxBorrow = (pos.collateralAmount * BigInt(dynamicLtvBps)) / 10000n;
-        const healthBps = maxBorrow === 0n ? 0n : (maxBorrow * 10000n) / pos.debtAmount;
+        // IMPORTANT: keep units consistent.
+        // - collateralAmount is ERC-1155 shares in 18 decimals
+        // - debtAmount is USDC in 6 decimals
+        // Convert collateral shares -> USD(6) using configured spot price, then apply dynamic LTV.
+        const spotPriceUsd6 = BigInt(Math.round(market.spotPrice * 1e6)); // e.g. $0.42 -> 420000
+        const collateralUsd6 =
+          (pos.collateralAmount * spotPriceUsd6) / 1_000_000_000_000_000_000n; // / 1e18
+        const maxBorrowUsd6 = (collateralUsd6 * BigInt(dynamicLtvBps)) / 10000n;
+        const healthBps = (maxBorrowUsd6 * 10000n) / pos.debtAmount;
         const healthFactor = Number(healthBps) / 10000;
 
         const shortUser = user.substring(0, 6) + "..." + user.substring(user.length - 4);
         runtime.log(
-          `[MONITOR] user=${shortUser} debt=${pos.debtAmount} collateral=${pos.collateralAmount} health=${healthFactor.toFixed(4)}`
+          `[MONITOR] user=${shortUser} debtUsd6=${pos.debtAmount} collateralUsd6=${collateralUsd6} health=${healthFactor.toFixed(4)}`
         );
 
-        if (healthFactor < runtime.config.ltv.liquidationThreshold) {
+        const thresholdBps = BigInt(Math.round(runtime.config.ltv.liquidationThreshold * 10000));
+        if (healthBps < thresholdBps) {
           if (pos.liquidatable) {
             runtime.log(`[MONITOR] Position already marked liquidatable (skip)`);
           } else {

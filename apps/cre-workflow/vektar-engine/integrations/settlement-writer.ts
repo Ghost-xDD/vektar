@@ -1,5 +1,5 @@
 import { bytesToHex, cre, getNetwork, hexToBase64, TxStatus, type Runtime } from "@chainlink/cre-sdk";
-import { encodeAbiParameters, parseAbiParameters } from "viem";
+import { encodeFunctionData, parseAbi } from "viem";
 import type { Config } from "../types";
 
 const isPlaceholderAddress = (address: string): boolean => {
@@ -35,10 +35,12 @@ export const settleLoanOnBase = (
     return "0x";
   }
 
-  const reportData = encodeAbiParameters(
-    parseAbiParameters("address user, uint256 tokenId, uint8 outcome, int256 netSettlement"),
-    [user as `0x${string}`, BigInt(tokenId), outcome, netSettlement]
-  );
+  // Must be selector-prefixed so the receiver's onReport router can dispatch.
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function settleLoan(address user, uint256 tokenId, uint8 outcome, int256 netSettlement, bytes proof)"]),
+    functionName: "settleLoan",
+    args: [user as `0x${string}`, BigInt(tokenId), outcome, netSettlement, "0x"],
+  });
 
   const report = runtime
     .report({
@@ -79,11 +81,12 @@ export const releaseCollateralOnPolygon = (
     return "0x";
   }
 
-  const reportData = encodeAbiParameters(parseAbiParameters("address user, uint256 tokenId, uint8 outcome"), [
-    user as `0x${string}`,
-    BigInt(tokenId),
-    outcome,
-  ]);
+  // Must be selector-prefixed so the receiver's onReport router can dispatch.
+  const reportData = encodeFunctionData({
+    abi: parseAbi(["function releaseOnSettlement(address user, uint256 tokenId, uint8 outcome)"]),
+    functionName: "releaseOnSettlement",
+    args: [user as `0x${string}`, BigInt(tokenId), outcome],
+  });
 
   const report = runtime
     .report({

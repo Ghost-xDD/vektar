@@ -10,3 +10,7 @@ docs/
 
 # Dotenv file
 .env
+DEPLOYMENT.md
+DEPLOYMENT-GUIDE.md
+DEPLOY.md
+DEPLOYMENT-GUIDE.md

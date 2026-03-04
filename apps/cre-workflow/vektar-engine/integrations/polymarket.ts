@@ -63,6 +63,46 @@ export const fetchOrderBook = (runtime: Runtime<Config>, tokenId: string): Order
 };
 
 /**
+ * Transform real order book to simulate liquidity scenarios.
+ * Instead of replacing with fake data, we modify the real market structure.
+ */
+const transformOrderBook = (
+  runtime: Runtime<Config>,
+  scenario: string,
+  realOrderBook: OrderBookResponse
+): OrderBookResponse => {
+  if (scenario === "thin") {
+    runtime.log(`[DEMO] 📉 Applying THIN liquidity transformation`);
+    // Simulate liquidity drain: reduce all bid sizes by 90%
+    // This creates high slippage when trying to sell large positions
+    return {
+      ...realOrderBook,
+      bids: realOrderBook.bids.map(bid => ({
+        price: bid.price,
+        size: bid.size * 0.10  // Keep only 10% of original liquidity
+      }))
+    };
+  }
+  
+  if (scenario === "crisis") {
+    runtime.log(`[DEMO] 🔥 Applying CRISIS liquidity transformation`);
+    // Simulate market panic: 
+    // 1. Reduce liquidity by 97% (extreme drain)
+    // 2. Apply 20% price decay (panic selling pushes prices down)
+    return {
+      ...realOrderBook,
+      bids: realOrderBook.bids.map(bid => ({
+        price: bid.price * 0.80,  // 20% price decay
+        size: bid.size * 0.03     // Keep only 3% of liquidity
+      }))
+    };
+  }
+  
+  // Normal: return unchanged
+  return realOrderBook;
+};
+
+/**
  * Merge Yes and No token order books into an effective bid-side view.
  *
  * Polymarket uses a Yes+No token pair where Yes price + No price = $1.00.
@@ -78,49 +118,60 @@ export const fetchMergedOrderBook = (
   yesTokenId: string,
   noTokenId: string | undefined,
 ): OrderBookResponse => {
+  // Step 1: Always fetch real data from Polymarket
   const yesBook = fetchOrderBook(runtime, yesTokenId);
+
+  let mergedBook: OrderBookResponse;
 
   if (!noTokenId) {
     runtime.log("[POLYMARKET] No noTokenId configured — using Yes-only book");
-    return yesBook;
+    mergedBook = yesBook;
+  } else {
+    runtime.log("[POLYMARKET] Fetching No token book for merged depth...");
+    const noBook = fetchOrderBook(runtime, noTokenId);
+
+    // Convert No asks → effective Yes bids  (No ask at P → Yes bid at 1-P)
+    const syntheticBids: OrderBookBid[] = noBook.asks
+      .map((a) => ({
+        price: Math.round((1 - a.price) * 100) / 100,
+        size: a.size,
+      }))
+      .filter((b) => b.price > 0 && b.size > 0);
+
+    // Merge native Yes bids + synthetic bids, sort by price descending
+    const allBids = [...yesBook.bids, ...syntheticBids].sort(
+      (a, b) => b.price - a.price,
+    );
+
+    // Convert No bids → effective Yes asks  (No bid at P → Yes ask at 1-P)
+    const syntheticAsks = noBook.bids
+      .map((b) => ({
+        price: Math.round((1 - b.price) * 100) / 100,
+        size: b.size,
+      }))
+      .filter((a) => a.price > 0 && a.size > 0);
+
+    const allAsks = [...yesBook.asks, ...syntheticAsks].sort(
+      (a, b) => a.price - b.price,
+    );
+
+    runtime.log(
+      `[CONSENSUS] ✓ Merged order book: ${allBids.length} bid levels, ${allAsks.length} ask levels`,
+    );
+
+    mergedBook = {
+      tokenId: yesTokenId,
+      bids: allBids,
+      asks: allAsks,
+      timestamp: Math.max(yesBook.timestamp, noBook.timestamp),
+    };
   }
 
-  runtime.log("[POLYMARKET] Fetching No token book for merged depth...");
-  const noBook = fetchOrderBook(runtime, noTokenId);
+  // Step 2: Apply demo transformation if needed
+  const demoScenario = runtime.config.demo?.scenario;
+  if (demoScenario && demoScenario !== "normal") {
+    return transformOrderBook(runtime, demoScenario, mergedBook);
+  }
 
-  // Convert No asks → effective Yes bids  (No ask at P → Yes bid at 1-P)
-  const syntheticBids: OrderBookBid[] = noBook.asks
-    .map((a) => ({
-      price: Math.round((1 - a.price) * 100) / 100,
-      size: a.size,
-    }))
-    .filter((b) => b.price > 0 && b.size > 0);
-
-  // Merge native Yes bids + synthetic bids, sort by price descending
-  const allBids = [...yesBook.bids, ...syntheticBids].sort(
-    (a, b) => b.price - a.price,
-  );
-
-  // Convert No bids → effective Yes asks  (No bid at P → Yes ask at 1-P)
-  const syntheticAsks = noBook.bids
-    .map((b) => ({
-      price: Math.round((1 - b.price) * 100) / 100,
-      size: b.size,
-    }))
-    .filter((a) => a.price > 0 && a.size > 0);
-
-  const allAsks = [...yesBook.asks, ...syntheticAsks].sort(
-    (a, b) => a.price - b.price,
-  );
-
-  runtime.log(
-    `[CONSENSUS] ✓ Merged order book: ${allBids.length} bid levels, ${allAsks.length} ask levels`,
-  );
-
-  return {
-    tokenId: yesTokenId,
-    bids: allBids,
-    asks: allAsks,
-    timestamp: Math.max(yesBook.timestamp, noBook.timestamp),
-  };
+  return mergedBook;
 };

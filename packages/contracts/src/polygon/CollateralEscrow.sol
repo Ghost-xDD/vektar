@@ -9,6 +9,10 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 /// @notice Locks Polymarket CTF (ERC-1155) tokens as collateral for cross-chain lending
 /// @dev Deployed on Polygon where Polymarket lives. Only CRE DON can authorize releases.
 contract CollateralEscrow is IERC1155Receiver {
+    // Report routing selectors (function selectors)
+    bytes4 private constant RELEASE_COLLATERAL_SELECTOR = 0xb21477d1; // releaseCollateral(address,uint256,uint256)
+    bytes4 private constant RELEASE_ON_SETTLEMENT_SELECTOR = 0x0ec32eb9; // releaseOnSettlement(address,uint256,uint8)
+
     /// @notice Polymarket CTF Exchange address (ERC-1155)
     address public immutable CTF_EXCHANGE;
     
@@ -47,6 +51,23 @@ contract CollateralEscrow is IERC1155Receiver {
         if (msg.sender != CRE_FORWARDER) revert OnlyCREForwarder();
         _;
     }
+
+    /// @notice Entry point for Chainlink Forwarder - routes reports to appropriate function
+    /// @param metadata Workflow metadata (unused)
+    /// @param report ABI-encoded function selector + parameters
+    function onReport(bytes calldata metadata, bytes calldata report) external onlyCREForwarder {
+        bytes4 selector = bytes4(report[0:4]);
+
+        if (selector == RELEASE_COLLATERAL_SELECTOR) {
+            (address user, uint256 tokenId, uint256 amount) = abi.decode(report[4:], (address, uint256, uint256));
+            _releaseCollateral(user, tokenId, amount);
+        } else if (selector == RELEASE_ON_SETTLEMENT_SELECTOR) {
+            (address user, uint256 tokenId, uint8 outcome) = abi.decode(report[4:], (address, uint256, uint8));
+            _releaseOnSettlement(user, tokenId, outcome);
+        } else {
+            revert("Unknown function selector");
+        }
+    }
     
     /// @notice User deposits prediction market shares as collateral
     /// @param tokenId The CTF token ID (represents a specific prediction market outcome)
@@ -78,6 +99,10 @@ contract CollateralEscrow is IERC1155Receiver {
         uint256 tokenId,
         uint256 amount
     ) external onlyCREForwarder {
+        _releaseCollateral(user, tokenId, amount);
+    }
+
+    function _releaseCollateral(address user, uint256 tokenId, uint256 amount) internal {
         if (amount == 0) revert InvalidAmount();
         if (lockedBalance[user][tokenId] < amount) revert InsufficientLockedBalance();
         
@@ -104,6 +129,10 @@ contract CollateralEscrow is IERC1155Receiver {
         uint256 tokenId,
         uint8 outcome
     ) external onlyCREForwarder {
+        _releaseOnSettlement(user, tokenId, outcome);
+    }
+
+    function _releaseOnSettlement(address user, uint256 tokenId, uint8 outcome) internal {
         uint256 amount = lockedBalance[user][tokenId];
         if (amount == 0) return; // No collateral to release
         
