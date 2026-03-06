@@ -10,9 +10,20 @@ isMarketResolved(id)        → true     ✓  (UMA)
 getSettlementValue(tokenId) → ???      ✗  (nobody)  ← this is what Vektar builds
 ```
 
-Every 12 seconds, a CRE workflow fetches the live Polymarket order book with BFT consensus, simulates the real exit cost via VWAP, and publishes a cryptographically-signed settlement value on-chain. Any protocol can read `getSettlementValue(tokenId)` — it is a public oracle, like Chainlink price feeds but for prediction market exit liquidity.
+Every 12 seconds, a CRE workflow fetches the live Polymarket order book via Confidential HTTP with BFT consensus, simulates the real exit cost via VWAP, and publishes a cryptographically-signed settlement value on-chain. Any protocol can read `getSettlementValue(tokenId)` — a public oracle, like Chainlink price feeds but for prediction market exit liquidity.
 
 We also built the first application on top of it: **early exit**. Users call `earlyExit()` to receive the oracle's settlement value in USDC immediately — position exits privately, no waiting for binary resolution. This is not the product. This is proof the oracle works.
+
+---
+
+## Track Fit
+
+**Prediction Markets.** Vektar is event-driven market resolution infrastructure. Handler 2 fires automatically on UMA's `QuestionResolved` event on Polygon — no human step, no keeper network. Handler 1 continuously tracks real exit value using offchain CLOB data with BFT consensus across every DON node. This is automated, verifiable settlement of prediction markets based on real-world data signals.
+
+**Privacy.** Three layers, all using Chainlink's privacy stack:
+- **Confidential HTTP** — Polymarket CLOB queries route through a TEE enclave. `token_id` never appears in node logs. Which market Vektar is pricing stays private.
+- **CRE Secrets Management** — the vault operator key used to authorize private payouts lives in the CRE Vault DON. It never touches code, logs, or the chain.
+- **Compliant Non-Public Token Movement** — when a user calls `earlyExit()`, Handler 3 routes the settlement to a shielded address via the Convergence 2026 private vault. Payout amount, recipient wallet, and operator identity are all hidden. Chainlink ACE enforces KYC/AML on every vault operation.
 
 ---
 
@@ -22,13 +33,13 @@ We also built the first application on top of it: **early exit**. Users call `ea
 
 **Novel data signal: order book depth.** Every existing oracle uses price or binary outcome as the settlement signal. Vektar is the first to use live CLOB order book depth — the actual buy-side liquidity your position would clear against. This is the only signal that answers "what will I walk away with?"
 
-**Dual settlement model.** Continuous oracle updates every 12 seconds (cron trigger) *and* automatic final settlement on market resolution (EVM log trigger). Most oracles are one or the other. Vektar runs both — the oracle tracks real exit value throughout a market's life, then fires settlement the instant the market resolves.
+**Dual settlement model.** Continuous oracle updates every 12 seconds (cron trigger) *and* automatic final settlement on market resolution (EVM log trigger on `QuestionResolved`). Most oracles are one or the other. Vektar runs both — the oracle tracks real exit value throughout a market's life, then fires the instant UMA resolves.
 
-**Cross-chain without bridging.** Collateral lives on Polygon (where Polymarket is). Settlement executes on Base (where DeFi liquidity is). CRE orchestrates reads and writes across both chains with BFT consensus. No bridge. No wrapped tokens. No $2B bridge hack exposure.
+**Cross-chain without bridging.** Collateral lives on Polygon (where Polymarket is). Settlement executes on Base (where DeFi liquidity is). CRE orchestrates reads and writes across both chains with BFT consensus. No bridge. No wrapped tokens.
 
-**Manipulation-resistant by design.** Three independent layers — time-weighted order book averaging, rate-limited on-chain updates, and a 10% safety margin — make oracle spoofing economically unprofitable. This isn't bolted on; it's the core of why the oracle is trustworthy.
+**Manipulation-resistant by design.** Three independent layers — time-weighted order book averaging, rate-limited on-chain updates, and a 10% safety margin — make oracle spoofing economically unprofitable.
 
-**Private by design.** Every `earlyExit()` payout routes through a Chainlink ACE-enforced private vault — amounts and recipient identities are never public on-chain. CRE handles both sides: Confidential HTTP hides which market is being priced (input privacy); CRE secrets management and private transfers hide who gets paid and how much (output privacy). Large players can exit without broadcasting their move to the market.
+**Private by design — input and output.** Confidential HTTP hides CLOB query parameters from node logs (input privacy). CRE secrets manage the vault operator key. Handler 3 routes payouts to shielded addresses via Chainlink ACE-enforced private vault (output privacy). The full settlement flow — which market is being priced, who is getting paid, and how much — is private.
 
 ---
 
@@ -48,14 +59,14 @@ Vektar builds that primitive.
 
 ## How It Works
 
-Every 12 seconds, a CRE workflow:
+Three CRE handlers, each triggered independently:
 
-1. **Fetches the order book** — Polymarket CLOB API with BFT consensus across all DON nodes
-2. **Reads locked collateral** — `CollateralEscrow` on Polygon (cross-chain read, no bridge)
-3. **Simulates a market sell** — VWAP against live bids, calculates what the position actually clears for after slippage
-4. **Writes a signed oracle report** — settlement value to `SettlementVault` on Base with cryptographic proof
+### Handler 1 — Settlement Oracle (cron, every 12s)
 
-A second handler fires on UMA's `QuestionResolved` event on Polygon — final settlement executes on Base automatically, no human step.
+1. **Fetches the order book** — Polymarket CLOB API via `ConfidentialHTTPClient`. The `token_id` query parameter routes through a TEE enclave — which market is being priced is never visible in node logs.
+2. **Reads locked collateral** — `CollateralEscrow` on Polygon via cross-chain EVM read, no bridge.
+3. **Simulates a market sell** — VWAP against live bid levels with Time-Weighted Order Book (TWOB) anti-manipulation. Applies 10% safety margin.
+4. **Writes a signed oracle report** — `settlementValueUSDC` to `SettlementVault` on Base, with cryptographic proof from BFT DON consensus.
 
 Here's the oracle running on the same position as liquidity dries up:
 
@@ -75,7 +86,72 @@ T+12h (event imminent, book empty)
   → Settlement value: $0       (price still says $7,500)
 ```
 
-The oracle reflects what the market can actually bear. Price-based settlement is wrong in every scenario above.
+**Verified:** Handler 1 simulation produced a real Tenderly transaction — `0xfa30f6...` — showing `updateSettlementValue` accepted by `SettlementVault.onReport()`.
+
+### Handler 2 — Final Settlement (EVM log: `QuestionResolved` on Polygon)
+
+Fires automatically when UMA's CTF Adapter emits `QuestionResolved`. Decodes the event, maps `questionId` to `tokenId`, writes `settlePosition` to Base and `releaseOnSettlement` to Polygon. No manual invocation.
+
+**Verified:** Simulated using a real Polygon mainnet tx (`0x8ee8b5d...`, block 83622941). Both Base and Polygon writes confirmed on Tenderly.
+
+### Handler 3 — Private Payout (EVM log: `EarlyExitExecuted` on Base)
+
+Fires when a user calls `earlyExit()`. Reads the user's registered shielded address from `SettlementVault.getShieldedAddress()`. Signs an EIP-712 private transfer with the vault operator key (from CRE secrets — never in code). Calls `POST /private-transfer` on the Convergence 2026 private vault API via `runtime.HTTP()`.
+
+Result: payout amount credited to the user's shielded address on Ethereum Sepolia. Recipient and amount are hidden. Operator identity is hidden via `hide-sender` flag. No on-chain link between the `earlyExit()` call and the payout destination.
+
+---
+
+## Privacy Architecture
+
+```
+VEKTAR PRIVACY STACK
+
+Layer 1 — Input privacy (Confidential HTTP)
+  Signal:   Polymarket CLOB order book
+  What's hidden: token_id in the request URL, full order book response
+  How: ConfidentialHTTPClient routes through a TEE enclave.
+       No DON node ever sees which market Vektar is pricing.
+  Track: CRE Confidential HTTP capability ✓
+
+Layer 2 — Key management (CRE Secrets)
+  Signal:   Vault operator authorization
+  What's hidden: VAULT_OPERATOR_KEY — never in code, logs, or any on-chain tx
+  How: runtime.getSecret("vaultOperatorKey") reads from the CRE Vault DON.
+       The key signs an EIP-712 message; the signature goes in the request body.
+       The key itself is never transmitted.
+  Track: "without exposing secrets" ✓
+
+Layer 3 — Output privacy (Convergence 2026 + Chainlink ACE)
+  Signal:   Settlement payout
+  What's hidden: payout amount, recipient wallet, operator identity
+  How: Handler 3 calls POST /private-transfer on the Convergence vault API.
+       Funds move to the user's shielded address.
+       hide-sender flag conceals operator identity from the recipient too.
+       Chainlink ACE enforces KYC/AML on every vault deposit and withdrawal.
+  Track: "compliant non-public token movement" ✓
+```
+
+Every vector is covered. Before Vektar: watching any DON node log reveals which market is being priced, who called `earlyExit()`, how much they received, and where it went. After Vektar: nothing.
+
+### Compliance demo
+
+```bash
+# ACE policy enforcement — view function, no gas, live on Sepolia
+# Whitelisted address → passes
+cast call 0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13 \
+  "checkWithdrawAllowed(address,address,uint256)" \
+  <WHITELISTED_ADDR> 0x779877A7B0D9E8603169DdbD7836e478b4624789 1000000000000000000 \
+  --rpc-url https://rpc.sepolia.org
+
+# Unknown address → reverts: operation_denied_by_policy
+```
+
+### Why the payout goes through CRE instead of a direct cross-chain call
+
+`SettlementVault` lives on a Tenderly Base mainnet fork. The Convergence private vault lives on Ethereum Sepolia. They cannot call each other. Handler 3 is CRE acting as the privacy bridge — it watches the Base event and calls the Sepolia vault API using operator credentials stored as CRE secrets. No bridge, no wrapped tokens, no on-chain cross-chain call.
+
+In production, deploying the private vault on the same chain as `SettlementVault` collapses this to a direct contract call inside `earlyExit()` — Handler 3 goes away entirely.
 
 ---
 
@@ -83,19 +159,21 @@ The oracle reflects what the market can actually bear. Price-based settlement is
 
 The oracle is infrastructure — `SettlementVault.getSettlementValue(tokenId)` is public, any protocol can consume it. We ship one reference application to prove it end-to-end.
 
-Users deposit prediction market shares into `CollateralEscrow` on Polygon, then call `earlyExit()` on Base — receiving USDC immediately at the oracle's current settlement value. The settlement pool holds the position and redeems it at resolution.
+Users register a shielded address, then deposit prediction market shares into `CollateralEscrow` on Polygon. On Base, they call `earlyExit()` — receiving USDC immediately at the oracle's current settlement value. Handler 3 routes the payout privately.
 
 ```
-User deposits 10,000 YES shares → locked in CollateralEscrow (Polygon)
-  └─ registers shielded address → identity unlinked on-chain
-CRE oracle: settlement value = $6,300
-User calls earlyExit() → $6,300 routed to private vault (Sepolia)
-  └─ amount hidden, recipient shielded — no public trace
-[3 weeks later] UMA resolves YES → CRE fires → pool redeems → $10,000
-Pool spread: $3,700
+User registers shielded address → generated in browser via viem (no external call)
+User deposits 20,000 YES shares → locked in CollateralEscrow (Polygon)
+CRE oracle: settlement value = $7,380 USDC (20,000 shares × $0.369)
+User calls earlyExit() → $7,380 USDC from SettlementVault (Base)
+Handler 3 fires → 1 LINK → user's shielded address (Convergence vault, Sepolia)
+  └─ amount hidden, recipient shielded, operator identity hidden
+[Resolution] UMA resolves → Handler 2 fires → settlePosition() on Base, releaseOnSettlement() on Polygon
 ```
 
-This is not the product. This is proof the oracle works. Lending, leverage, options — any protocol building on prediction markets needs `getSettlementValue()`. We're the first to build it.
+**Demo market:** Will Bitcoin reach $100,000 by Dec 31, 2026? YES token ID: `5607893806009697644...`
+
+**Dashboard** shows the live oracle running: settlement value updating every 12 seconds, order book chart with normal/thin/crisis scenario controls, position status, shielded address, early exit button with the four-state flow (pending → confirmed → routing private → complete), and an activity feed of every `SettlementValueUpdated` and `EarlyExitExecuted` event linked to Tenderly.
 
 ---
 
@@ -151,7 +229,9 @@ CRE reads `getLockedBalance()` — not `balanceOf`. The position is verifiably f
 
 This oracle cannot be built on any other platform. It requires six capabilities simultaneously:
 
-**Consensus on offchain APIs.** Every DON node independently fetches the Polymarket CLOB. BFT consensus across nodes ensures no single node can manipulate the settlement value — the order book data is as trustworthy as any on-chain read.
+**Consensus on offchain APIs.** Every DON node independently fetches the Polymarket CLOB via Confidential HTTP. BFT consensus across nodes ensures no single node can manipulate the settlement value. The order book data is as trustworthy as any on-chain read.
+
+**Confidential HTTP.** The Polymarket CLOB request routes through a TEE enclave — `token_id` and the full response are hidden from node logs. API credentials can be injected via Vault DON secrets without appearing in workflow config. No other oracle platform offers this.
 
 **Cross-chain reads.** Collateral is on Polygon. CRE reads the locked escrow balance without bridging — native cross-chain state verification.
 
@@ -159,9 +239,7 @@ This oracle cannot be built on any other platform. It requires six capabilities 
 
 **Dual triggers.** Cron every 12s for continuous settlement value updates. EVM log trigger on `QuestionResolved` for automatic final settlement — no manual invocation, no keeper network required.
 
-**Cryptographic proofs.** Every oracle update is a signed DON report. The settlement value isn't a trusted call from a server — it's a proven output from a distributed consensus process.
-
-**Secrets management for private API calls.** When `earlyExit()` fires, a third CRE handler routes the payout to the user's shielded address via the private vault API — using a vault operator key stored as a CRE workflow secret, never in code or logs. Confidential HTTP keeps CLOB query parameters out of node logs. No other oracle platform can do credentialed offchain API calls with secrets managed this way.
+**Secrets management for private API calls.** Handler 3's vault operator key lives in the CRE Vault DON — `runtime.getSecret("vaultOperatorKey")`. It is never in code, never in logs, never on-chain. This is the only platform where credentialed offchain API calls can be orchestrated this way.
 
 No bridge. Collateral stays on Polygon. Settlement executes on Base. Payouts are private.
 
@@ -170,26 +248,34 @@ No bridge. Collateral stays on Polygon. Settlement executes on Base. Payouts are
 ## Architecture
 
 ```
-Polygon              CRE (DON)                  Base              Sepolia
-───────              ─────────                  ────              ───────
-CollateralEscrow ──read──▶ Workflow ──write──▶ SettlementVault
-(locked tokens)            (every 12s)          earlyExit() ↓
-                                                      │
-UMA CTF Adapter ──log───▶  settlePosition ──────────▶ settlePosition()
-(QuestionResolved)                                    (final settlement)
-                           │
-                           └──▶ Handler 3 ──HTTP──▶ PrivateVault
-                                (EarlyExitExecuted     (shielded payout
-                                 log trigger)           amount + recipient hidden)
+Polygon (Tenderly fork)    CRE Workflow (DON)           Base (Tenderly fork)
+───────────────────────    ──────────────────           ────────────────────
+CollateralEscrow     ──read──▶ Handler 1 (cron/12s) ──write──▶ SettlementVault
+0x194E19AF...               Confidential HTTP                  0x287c88c8...
+(locked CTF tokens)         VWAP + TWOB                        getSettlementValue()
+                            BFT consensus                      earlyExit()
+                                                               EarlyExitExecuted ↓
+UMA CTF Adapter   ──log──▶ Handler 2          ──write──▶ settlePosition()
+(QuestionResolved)          (final settlement)  ──write──▶ releaseOnSettlement()
+
+                           Handler 3                          Convergence vault
+                           (EarlyExitExecuted)  ──HTTP──▶    (Ethereum Sepolia)
+                            reads: shielded addr             0xE588a6c7...
+                            signs: EIP-712                   private-transfer API
+                            key:   CRE secret                ACE compliance
+                                                             shielded payout
 ```
 
 **Contracts:**
 
-| Contract | Chain | Role |
-|----------|-------|------|
-| `CollateralEscrow.sol` | Polygon | Locks CTF tokens; only CRE DON can release |
-| `SettlementVault.sol` | Base | Stores oracle reports; executes early exits; public `getSettlementValue()` |
-| `DemoCompliantPrivateTokenVault` | Sepolia | Chainlink ACE-enforced private vault; hidden balances and transfers |
+| Contract | Chain | Address |
+|----------|-------|---------|
+| `CollateralEscrow.sol` | Polygon (Tenderly mainnet fork) | `0x194E19AF9bfe69aDA8de9df3eAfAebbe60d0bC74` |
+| `SettlementVault.sol` | Base (Tenderly mainnet fork) | `0x287c88c8c9245daa6a220fef38054fcd174e65c8` |
+| `DemoCompliantPrivateTokenVault` | Ethereum Sepolia | `0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13` |
+| CRE Forwarder (mock) | Base fork | `0x5e342a8438b4f5d39e72875fcee6f76b39cce548` |
+
+**Why Tenderly mainnet forks:** Polymarket's real CTF token state exists on Polygon mainnet. Real USDC is on Base mainnet. Real UMA `QuestionResolved` events are on Polygon mainnet. Using mainnet forks means Handler 2 can be triggered with a real historical UMA tx hash — no mock oracles, no mock events.
 
 **Key interfaces:**
 
@@ -202,8 +288,7 @@ function getLockedBalance(address user, uint256 tokenId) external view returns (
 function getSettlementValue(uint256 tokenId) external view returns (uint256, uint256);
 function getShieldedAddress(address user, uint256 tokenId) external view returns (address);
 function earlyExit(uint256 tokenId) external;
-function updateSettlementValue(uint256 tokenId, uint256 value, bytes calldata proof) external onlyCREForwarder;
-function settlePosition(address user, uint256 tokenId, uint8 outcome, bytes calldata proof) external onlyCREForwarder;
+function registerPosition(address user, uint256 tokenId, uint256 shares, address polygonAddress, address shieldedAddress) external;
 ```
 
 ---
@@ -229,28 +314,68 @@ Combined: profitable exploitation requires real capital on Polymarket for 60+ se
 | **Settlement signal** | Binary (0 or $1) | Mark-to-market price | AI confidence score | **VWAP on live order book** |
 | **Liquidity-aware?** | No | No | No | **Yes — actual bid depth, every 12s** |
 | **Early exit?** | Wait for resolution | Sell on CLOB (slippage unknown) | Wait for resolution | **Instant at verified fair value** |
-| **Settlement timing** | On resolution only | On resolution only | On resolution only | **Continuous + on resolution** |
+| **Settlement timing** | On resolution only | On resolution only | On resolution only | **Continuous + automatic on resolution** |
 | **Data verification** | Trust the market | Trust single API | Trust an AI model | **BFT consensus across DON nodes** |
 | **Cross-chain** | Single chain | Bridge required | Single chain | **No bridge — CRE orchestrates** |
 | **Manipulation resistance** | None | Oracle risk | Model risk | **TWOB + rate limiting + safety margin** |
-| **Settlement privacy** | None | None | None | **Private payouts — amounts and recipients hidden** |
+| **Settlement privacy** | None | None | None | **Private payouts — Confidential HTTP + ACE vault** |
 | **$10k position, $2k liquidity** | $10k or $0 | $7,500 (wrong) | $7,500 (wrong) | **$2,700 (real exit value)** |
 
 ---
 
 ## Quick Start
 
-**Prerequisites:** [Bun](https://bun.sh/) v1.2.14+, [Foundry](https://getfoundry.sh/), [CRE CLI](https://docs.chain.link/cre/getting-started/cli-installation), Node.js v20+
+**Prerequisites:** [Bun](https://bun.sh/) v1.2+, [Foundry](https://getfoundry.sh/), [CRE CLI](https://docs.chain.link/cre/getting-started/cli-installation)
 
 ```bash
 bun install
-cd packages/contracts && forge install
-cp .env.example .env
 
-bun run workflow:simulate         # CRE simulation
-bun run contracts:deploy:polygon  # Polygon Amoy
-bun run contracts:deploy:base     # Base Sepolia
-bun test
+# Set up environment — Tenderly fork RPCs and contract addresses
+# See apps/cre-workflow/.env for the full variable list
+cp env.template apps/cre-workflow/.env
+```
+
+**Run Handler 1 — settlement oracle (cron trigger):**
+```bash
+cd apps/cre-workflow
+cre workflow simulate vektar-engine --non-interactive --trigger-index 0
+# Expected: [TX] 0xfa30f6... ✓  updateSettlementValue accepted
+```
+
+**Run Handler 2 — final settlement (UMA event trigger):**
+```bash
+cre workflow simulate vektar-engine \
+  --non-interactive \
+  --trigger-index 1 \
+  --evm-tx-hash 0x8ee8b5de01a44a65b793eadc0be5a3e1a6d4a0b7d95cca29eb96e1aadc30e4dc \
+  --evm-event-index 0
+# Expected: settlePosition on Base ✓, releaseOnSettlement on Polygon ✓
+```
+
+**Run Handler 3 — private payout (EarlyExitExecuted trigger):**
+```bash
+# First call earlyExit() on the Base fork, then:
+cre workflow simulate vektar-engine \
+  --non-interactive \
+  --trigger-index 2 \
+  --evm-tx-hash <TX_FROM_EARLY_EXIT> \
+  --evm-event-index 1
+# Expected: [PRIVATE PAYOUT] ✅ transaction_id: 019cc054-...
+```
+
+**Dashboard:**
+```bash
+cd apps/dashboard && bun dev
+# Opens at localhost:5173
+# Toggle normal/thin/crisis scenarios to show the liquidity illusion live
+```
+
+**Check oracle value on-chain:**
+```bash
+cast call 0x287c88c8c9245daa6a220fef38054fcd174e65c8 \
+  "getSettlementValue(uint256)(uint256,uint256)" \
+  56078938060096976448086754249497300447360333783952000147427828224794011030104 \
+  --rpc-url $BASE_TENDERLY_RPC
 ```
 
 ---
@@ -258,16 +383,37 @@ bun test
 ## Repo
 
 ```
-apps/cre-workflow/vektar-engine/
-  handlers/
-    monitor-liquidity.ts           # Handler 1: settlement oracle (cron, every 12s)
-    settle-position.ts             # Handler 2: final settlement (UMA event trigger)
-    private-payout.ts              # Handler 3: private vault routing (EarlyExitExecuted trigger)
-packages/contracts/src/
-  polygon/CollateralEscrow.sol
-  base/SettlementVault.sol
-packages/core/settlement-engine/   # VWAP calculation
-docs/                              # Architecture + contract specs
+apps/
+  cre-workflow/vektar-engine/
+    handlers/
+      monitor-liquidity.ts        # Handler 1: settlement oracle (cron, every 12s)
+      settle-position.ts          # Handler 2: final settlement (UMA QuestionResolved)
+      private-payout.ts           # Handler 3: private payout (EarlyExitExecuted → Convergence)
+    integrations/
+      polymarket.ts               # Confidential HTTP CLOB fetch + order book parsing
+      collateral-reader.ts        # Cross-chain read from Polygon CollateralEscrow
+      settlement-oracle-writer.ts # Signed oracle report → SettlementVault.onReport()
+    main.ts                       # Three-handler workflow registration
+    workflow.yaml
+    project.yaml                  # Tenderly fork RPC overrides for CRE simulator
+    secrets.yaml                  # Maps VAULT_OPERATOR_KEY + VAULT_TOKEN to CRE secrets
+  dashboard/
+    src/
+      hooks/                      # useSettlementValue, usePosition, useOrderBook,
+                                  # useEarlyExit, useShieldedAddress, useActivityEvents,
+                                  # useEventWatcher, useWallet, useRegisterPosition
+      components/                 # SettlementOracle, OrderBookChart, EarlyExitButton,
+                                  # PositionCard, ShieldedAddressCard, ActivityFeed
+      pages/
+        DemoPage.tsx              # Normal / thin / crisis scenario controls
+packages/
+  contracts/src/
+    polygon/CollateralEscrow.sol  # Locks CTF tokens; only CRE DON can release
+    base/SettlementVault.sol      # Oracle reports, earlyExit(), public getSettlementValue()
+  core/ltv-engine/
+    calculate-ltv.ts              # VWAP simulation against live bid levels
+    twob-tracker.ts               # Time-weighted order book (anti-manipulation)
+docs/                             # Architecture + contract specs
 ```
 
 ---
