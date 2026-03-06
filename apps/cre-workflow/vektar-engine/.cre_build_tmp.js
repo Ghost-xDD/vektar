@@ -34177,7 +34177,7 @@ var transformOrderBook = (runtime2, scenario, realOrderBook) => {
     return {
       ...realOrderBook,
       bids: realOrderBook.bids.map((bid) => ({
-        price: bid.price * 0.8,
+        price: bid.price * 0.35,
         size: bid.size * 0.03
       }))
     };

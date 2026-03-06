@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run one settlement oracle cycle with CRISIS liquidity scenario
-# Real order book data transformed: 97% liquidity drain + 20% price decay
-# Demonstrates: spot price $X, oracle says $0 — the liquidity illusion in action
+# Real order book data transformed: 97% liquidity drain + 65% price decay
+# Demonstrates: spot price $X, oracle collapses to ~$0.14 — the liquidity illusion in action
 
 set -e
 cd "$(dirname "$0")"
@@ -24,8 +24,8 @@ echo "=========================================="
 echo ""
 echo "Transformation applied to real order book:"
 echo "  - 97% liquidity drain (3% of real bids survive)"
-echo "  - 20% price decay (panic selling pressure)"
-echo "  - Result: settlement value collapses toward \$0"
+echo "  - 65% price decay (distressed sellers dump far below spot)"
+echo "  - Result: oracle collapses from ~\$7,200 → ~\$2,500 total exit"
 echo "  - Spot price unchanged — this is the liquidity illusion"
 echo ""
 

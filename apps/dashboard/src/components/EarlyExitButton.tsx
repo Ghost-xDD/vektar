@@ -6,9 +6,11 @@ import {
   ExternalLink,
   AlertCircle,
   RotateCcw,
-  Shield
+  Shield,
+  Wallet,
 } from 'lucide-react';
 import type { ExitState } from '../hooks/useEarlyExit';
+import type { BalanceState, ConvergenceBalance } from '../hooks/useConvergenceBalance';
 
 interface EarlyExitButtonProps {
   state: ExitState;
@@ -24,6 +26,11 @@ interface EarlyExitButtonProps {
   onExecute: () => void;
   onMarkComplete: () => void;
   onReset: () => void;
+  // Convergence balance
+  balanceState: BalanceState;
+  balances: ConvergenceBalance[];
+  balanceError: string | null;
+  onFetchBalance: () => void;
 }
 
 export function EarlyExitButton({
@@ -39,7 +46,11 @@ export function EarlyExitButton({
   isCorrectChain,
   onExecute,
   onMarkComplete,
-  onReset
+  onReset,
+  balanceState,
+  balances,
+  balanceError,
+  onFetchBalance,
 }: EarlyExitButtonProps) {
   const canExit =
     isConnected &&
@@ -186,10 +197,11 @@ export function EarlyExitButton({
             <div>
               <p className="text-sm font-semibold text-green-800">Private payout complete</p>
               <p className="text-[11px] text-green-600 mt-0.5">
-                transaction_id: 019cc054-4db0-7c61-aa2d-5bf65c456bd0
+                Routed via Convergence · shielded address credited
               </p>
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <div className="bg-white/60 rounded-lg p-2.5 border border-green-200">
               <p className="text-green-700 font-medium">Recipient</p>
@@ -197,9 +209,54 @@ export function EarlyExitButton({
             </div>
             <div className="bg-white/60 rounded-lg p-2.5 border border-green-200">
               <p className="text-green-700 font-medium">Amount</p>
-              <p className="text-green-600 mt-0.5">private</p>
+              <p className="text-green-600 mt-0.5">1 LINK (private)</p>
             </div>
           </div>
+
+          {/* Convergence balance check */}
+          {balanceState === 'idle' && (
+            <button
+              onClick={onFetchBalance}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-green-300 bg-white/60 hover:bg-white text-[12px] font-medium text-green-800 transition-colors"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              Check shielded balance
+            </button>
+          )}
+
+          {(balanceState === 'switching-sepolia' ||
+            balanceState === 'signing' ||
+            balanceState === 'switching-back' ||
+            balanceState === 'fetching') && (
+            <div className="flex items-center gap-2 text-[11px] text-green-700">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {balanceState === 'switching-sepolia' ? 'Switching to Sepolia…'
+               : balanceState === 'signing'          ? 'Sign in wallet…'
+               : balanceState === 'switching-back'   ? 'Switching back…'
+               : 'Fetching balance…'}
+            </div>
+          )}
+
+          {balanceState === 'done' && balances.length > 0 && (
+            <div className="bg-white/70 rounded-lg border border-green-200 p-3 space-y-1">
+              <p className="text-[11px] text-green-700 font-medium uppercase tracking-wide">
+                Shielded balance (Convergence vault)
+              </p>
+              {balances.map((b, i) => (
+                <p key={i} className="text-sm font-mono font-semibold text-green-900">
+                  {b.formatted}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {balanceState === 'error' && balanceError && (
+            <div className="flex items-start gap-1.5 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{balanceError}</span>
+            </div>
+          )}
+
           <p className="text-[10px] text-green-600/80">
             No on-chain link between exit and payout destination.
           </p>

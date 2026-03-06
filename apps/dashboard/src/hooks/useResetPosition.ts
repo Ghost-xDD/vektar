@@ -26,7 +26,8 @@ const PAID_OUT_OFFSET    = 2n;
 const SETTLED_POLY_OFFSET = 3n;
 const SHIELDED_OFFSET    = 4n;
 
-const SHARES_RESET = 20_000n;
+// Zero out so that the next registerPosition() call (which does +=) lands at exactly 20,000.
+const SHARES_RESET = 0n;
 
 function positionBaseSlot(userAddress: `0x${string}`): bigint {
   // keccak256(abi.encode(user, POSITIONS_SLOT))

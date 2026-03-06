@@ -2,7 +2,7 @@
   "polygon": {
     "chainSelectorName": "polygon-mainnet",
     "isTestnet": false,
-    "escrowAddress": "0x194E19AF9bfe69aDA8de9df3eAfAebbe60d0bC74",
+    "escrowAddress": "0xC6816eBE0a22B1C2de557bEF30852fa8968D2296",
     "umaOracleAddress": "0xBb1A8db2D4350976a11cdfA60A1d43f97710Da49",
     "umaCtfAdapterAddress": "0x6A9D222616C90FcA5754cd1333cFD9b7fb6a4F74",
     "gasLimit": "500000"

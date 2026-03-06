@@ -1,4 +1,4 @@
-import { Layers, Shield, Circle } from 'lucide-react';
+import { Shield, Circle } from 'lucide-react';
 import { LOGOS } from '../lib/logos';
 import { ResetPositionButton } from './ResetPositionButton';
 
@@ -6,6 +6,7 @@ interface PositionCardProps {
   userAddress: `0x${string}` | null;
   shares: number;
   settled: boolean;
+  isFinallySettled?: boolean;
   polygonAddress: `0x${string}` | null;
   shieldedAddress: `0x${string}` | null;
   newShieldedAddress?: `0x${string}` | null;
@@ -20,8 +21,9 @@ function truncateAddr(addr: string) {
   return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
 }
 
-function getStatus(settled: boolean, hasPosition: boolean) {
-  if (settled) return { label: 'Exited', color: 'text-zinc-500', bg: 'bg-zinc-100', dot: 'bg-zinc-400' };
+function getStatus(settled: boolean, hasPosition: boolean, isFinallySettled?: boolean) {
+  if (settled && isFinallySettled) return { label: 'Settled', color: 'text-green-700', bg: 'bg-green-50', dot: 'bg-green-500' };
+  if (settled) return { label: 'Exited', color: 'text-indigo-600', bg: 'bg-indigo-50', dot: 'bg-indigo-400' };
   if (hasPosition) return { label: 'Active', color: 'text-green-600', bg: 'bg-green-50', dot: 'bg-green-500' };
   return { label: 'No position', color: 'text-zinc-400', bg: 'bg-zinc-50', dot: 'bg-zinc-300' };
 }
@@ -30,6 +32,7 @@ export function PositionCard({
   userAddress,
   shares,
   settled,
+  isFinallySettled,
   polygonAddress,
   shieldedAddress,
   newShieldedAddress,
@@ -39,7 +42,7 @@ export function PositionCard({
   isConnected,
   isCorrectChain
 }: PositionCardProps) {
-  const status = getStatus(settled, hasPosition);
+  const status = getStatus(settled, hasPosition, isFinallySettled);
   const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
   return (
@@ -61,9 +64,9 @@ export function PositionCard({
           <span className="font-medium text-zinc-800">BTC $100k YES</span>
         </div>
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-zinc-500">Shares locked</span>
-          <span className="font-semibold font-mono text-zinc-900">
-            {isLoading ? '...' : (shares > 0 ? shares.toLocaleString() : lockedShares.toLocaleString())}
+          <span className="text-zinc-500">{settled ? 'Shares redeemed' : 'Shares locked'}</span>
+          <span className={`font-semibold font-mono ${settled ? 'text-zinc-400 line-through' : 'text-zinc-900'}`}>
+            {isLoading ? '...' : settled ? '0' : (shares > 0 ? shares.toLocaleString() : lockedShares.toLocaleString())}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px]">
@@ -108,10 +111,14 @@ export function PositionCard({
       {/* Settled state + reset */}
       {settled && (
         <div className="space-y-3">
-          <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-center">
-            <p className="text-[12px] text-zinc-600 font-medium">Position exited via earlyExit()</p>
+          <div className={`border rounded-lg p-3 text-center ${isFinallySettled ? 'bg-green-50 border-green-200' : 'bg-indigo-50/60 border-indigo-100'}`}>
+            <p className={`text-[12px] font-medium ${isFinallySettled ? 'text-green-700' : 'text-indigo-700'}`}>
+              {isFinallySettled ? 'Market resolved · position settled on-chain' : 'Position exited via earlyExit()'}
+            </p>
             <p className="text-[11px] text-zinc-400 mt-0.5">
-              USDC paid out · private payout completed
+              {isFinallySettled
+                ? 'UMA oracle resolved · CRE wrote Base + Polygon'
+                : 'USDC paid out · private payout completed'}
             </p>
           </div>
           <div className="border-t border-zinc-100 pt-3">

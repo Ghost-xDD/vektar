@@ -86,13 +86,15 @@ const transformOrderBook = (
   
   if (scenario === "crisis") {
     runtime.log(`[DEMO] 🔥 Applying CRISIS liquidity transformation`);
-    // Simulate market panic: 
-    // 1. Reduce liquidity by 97% (extreme drain)
-    // 2. Apply 20% price decay (panic selling pushes prices down)
+    // Simulate market panic:
+    // 1. Reduce liquidity by 97% (extreme drain — no one is buying)
+    // 2. Apply 65% price decay (distressed sellers dump far below spot)
+    // Result: VWAP collapses from ~$0.40 → ~$0.14, oracle from ~$7200 → ~$2500
+    // Spot price unchanged — this is the liquidity illusion
     return {
       ...realOrderBook,
       bids: realOrderBook.bids.map(bid => ({
-        price: bid.price * 0.80,  // 20% price decay
+        price: bid.price * 0.35,  // 65% price decay
         size: bid.size * 0.03     // Keep only 3% of liquidity
       }))
     };

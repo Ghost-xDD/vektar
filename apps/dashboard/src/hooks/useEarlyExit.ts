@@ -61,8 +61,8 @@ export function useEarlyExit() {
 
   const [transactionId, setTransactionId] = useState<string | null>(null);
 
-  const markPrivateComplete = (txId: string) => {
-    setTransactionId(txId);
+  const markPrivateComplete = (txId?: string) => {
+    setTransactionId(txId ?? null);
     setState('private_complete');
   };
 

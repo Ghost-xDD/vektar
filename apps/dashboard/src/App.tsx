@@ -11,6 +11,7 @@ import { useActivityEvents } from './hooks/useActivityEvents';
 import { useEarlyExit } from './hooks/useEarlyExit';
 import { useShieldedAddress } from './hooks/useShieldedAddress';
 import { useRegisterPosition } from './hooks/useRegisterPosition';
+import { useConvergenceBalance } from './hooks/useConvergenceBalance';
 import { useEventWatcher } from './hooks/useEventWatcher';
 import { useWallet } from './hooks/useWallet';
 import { SettlementOracle } from './components/SettlementOracle';
@@ -35,8 +36,10 @@ export default function App() {
   const earlyExit = useEarlyExit();
   const shieldedAddr = useShieldedAddress();
   const registerPosition = useRegisterPosition();
+  const convergenceBalance = useConvergenceBalance();
 
   const spotPrice = orderBook?.bids?.[0]?.price ?? 0;
+  const isFinallySettled = events.some(e => e.type === 'final_settlement');
 
   return (
     <div className="min-h-screen w-full relative bg-white">
@@ -155,7 +158,9 @@ export default function App() {
                 </span>
                 <span>
                   Shares:{' '}
-                  <span className="font-mono text-zinc-700 font-medium">20,000 YES</span>
+                  <span className={`font-mono font-medium ${position?.settled ? 'text-zinc-400 line-through' : 'text-zinc-700'}`}>
+                    {position?.settled ? '0' : '20,000 YES'}
+                  </span>
                 </span>
                 <span>
                   User:{' '}
@@ -231,6 +236,7 @@ export default function App() {
               userAddress={wallet.address}
               shares={position?.shares ?? 0}
               settled={position?.settled ?? false}
+              isFinallySettled={isFinallySettled}
               polygonAddress={position?.polygonAddress ?? null}
               shieldedAddress={position?.shieldedAddress ?? null}
               newShieldedAddress={shieldedAddr.shieldedAddress}
@@ -265,7 +271,11 @@ export default function App() {
               isCorrectChain={wallet.isCorrectChain}
               onExecute={earlyExit.execute}
               onMarkComplete={() => earlyExit.markPrivateComplete()}
-              onReset={earlyExit.reset}
+              onReset={() => { earlyExit.reset(); convergenceBalance.reset(); }}
+              balanceState={convergenceBalance.state}
+              balances={convergenceBalance.balances}
+              balanceError={convergenceBalance.error}
+              onFetchBalance={convergenceBalance.fetchBalance}
             />
           </div>
 
@@ -295,7 +305,7 @@ export default function App() {
               <Activity className="w-4 h-4 text-zinc-500" />
               <h3 className="text-sm font-semibold text-zinc-900">Activity Feed</h3>
               <span className="text-[10px] text-zinc-400">
-                SettlementValueUpdated · EarlyExitExecuted
+                Oracle · Exit · Settlement
               </span>
             </div>
             {events.length > 0 && (

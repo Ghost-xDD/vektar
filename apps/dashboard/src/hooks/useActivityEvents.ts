@@ -30,7 +30,7 @@ export function useActivityEvents() {
         const currentBlock = await baseClient.getBlockNumber();
         const fromBlock = currentBlock > 2000n ? currentBlock - 2000n : 0n;
 
-        const [oracleUpdates, earlyExits] = await Promise.all([
+        const [oracleUpdates, earlyExits, finalSettlements] = await Promise.all([
           baseClient.getLogs({
             address: VAULT_ADDRESS,
             event: parseAbiItem(
@@ -48,13 +48,23 @@ export function useActivityEvents() {
             args: { tokenId: TOKEN_ID },
             fromBlock,
             toBlock: 'latest'
+          }),
+          baseClient.getLogs({
+            address: VAULT_ADDRESS,
+            event: parseAbiItem(
+              'event FinalSettlement(address indexed user, uint256 indexed tokenId, uint8 outcome, uint256 poolPayout)'
+            ),
+            args: { tokenId: TOKEN_ID },
+            fromBlock,
+            toBlock: 'latest'
           })
         ]);
 
         // Collect unique block numbers to fetch timestamps
         const blockNums = new Set([
           ...oracleUpdates.map((l) => l.blockNumber!),
-          ...earlyExits.map((l) => l.blockNumber!)
+          ...earlyExits.map((l) => l.blockNumber!),
+          ...finalSettlements.map((l) => l.blockNumber!)
         ]);
         const timestamps = new Map<bigint, Date>();
         await Promise.all(
@@ -68,10 +78,27 @@ export function useActivityEvents() {
           })
         );
 
+        const OUTCOME_LABEL: Record<number, string> = { 0: 'NO ✗', 1: 'YES ✓', 2: 'INVALID' };
+
         const events: ActivityEvent[] = [
+          ...finalSettlements.map((log) => {
+            const args = log.args as { outcome?: number; poolPayout?: bigint };
+            const outcome = Number(args.outcome ?? 0);
+            const poolPayout = Number(args.poolPayout ?? 0n) / 1e6;
+            return {
+              id: `${log.transactionHash}-${log.logIndex}`,
+              type: 'final_settlement' as const,
+              description: `Final settlement: ${OUTCOME_LABEL[outcome] ?? outcome} · pool paid $${poolPayout.toFixed(2)} USDC`,
+              txHash: log.transactionHash!,
+              blockNumber: log.blockNumber!,
+              timestamp: timestamps.get(log.blockNumber!),
+              tenderlyUrl: tenderlyUrl(log.transactionHash!)
+            };
+          }),
           ...oracleUpdates.map((log) => {
-            const newVal = Number((log.args as any).newValue ?? 0n) / 1e6;
-            const oldVal = Number((log.args as any).oldValue ?? 0n) / 1e6;
+            const oArgs = log.args as { newValue?: bigint; oldValue?: bigint };
+            const newVal = Number(oArgs.newValue ?? 0n) / 1e6;
+            const oldVal = Number(oArgs.oldValue ?? 0n) / 1e6;
             return {
               id: `${log.transactionHash}-${log.logIndex}`,
               type: 'oracle_update' as const,
@@ -86,7 +113,8 @@ export function useActivityEvents() {
             };
           }),
           ...earlyExits.map((log) => {
-            const payout = Number((log.args as any).payout ?? 0n) / 1e6;
+            const eArgs = log.args as { payout?: bigint };
+            const payout = Number(eArgs.payout ?? 0n) / 1e6;
             return {
               id: `${log.transactionHash}-${log.logIndex}`,
               type: 'early_exit' as const,
