@@ -15,6 +15,7 @@ export interface ActivityEvent {
   blockNumber: bigint;
   timestamp?: Date;
   tenderlyUrl: string;
+  outcome?: number;
 }
 
 const BASE_VNET = '2e625465-6c0e-4577-b01f-790eb8000996';
@@ -78,21 +79,21 @@ export function useActivityEvents() {
           })
         );
 
-        const OUTCOME_LABEL: Record<number, string> = { 0: 'NO ✗', 1: 'YES ✓', 2: 'INVALID' };
+        const OUTCOME_LABEL: Record<number, string> = { 0: 'NO', 1: 'YES', 2: 'INVALID' };
 
         const events: ActivityEvent[] = [
           ...finalSettlements.map((log) => {
-            const args = log.args as { outcome?: number; poolPayout?: bigint };
+            const args = log.args as { outcome?: number };
             const outcome = Number(args.outcome ?? 0);
-            const poolPayout = Number(args.poolPayout ?? 0n) / 1e6;
             return {
               id: `${log.transactionHash}-${log.logIndex}`,
               type: 'final_settlement' as const,
-              description: `Final settlement: ${OUTCOME_LABEL[outcome] ?? outcome} · pool paid $${poolPayout.toFixed(2)} USDC`,
+              description: `Final settlement: ${OUTCOME_LABEL[outcome] ?? outcome}`,
               txHash: log.transactionHash!,
               blockNumber: log.blockNumber!,
               timestamp: timestamps.get(log.blockNumber!),
-              tenderlyUrl: tenderlyUrl(log.transactionHash!)
+              tenderlyUrl: tenderlyUrl(log.transactionHash!),
+              outcome
             };
           }),
           ...oracleUpdates.map((log) => {

@@ -119,6 +119,19 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
                   ? 'Exit'
                   : 'Settlement'}
               </span>
+              {event.type === 'final_settlement' && event.outcome !== undefined && (
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                    event.outcome === 1
+                      ? 'bg-green-100 text-green-700'
+                      : event.outcome === 2
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {event.outcome === 1 ? 'YES' : event.outcome === 2 ? 'INVALID' : 'NO'}
+                </span>
+              )}
             </div>
           </div>
 

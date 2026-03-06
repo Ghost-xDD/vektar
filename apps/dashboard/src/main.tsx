@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import App from './App.tsx';
 import { FaucetPage } from './pages/FaucetPage.tsx';
+import { DemoPage } from './pages/DemoPage.tsx';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/faucet" element={<FaucetPage />} />
+          <Route path="/demo" element={<DemoPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

@@ -45,10 +45,11 @@ function transformOrderBook(scenario: string, realBids: OrderBookLevel[]): Order
   }
   
   if (scenario === 'crisis') {
-    // Simulate market panic: 97% liquidity drain + 20% price decay
+    // Simulate market panic: 97% liquidity drain + 65% price decay
+    // Matches CRE workflow crisis transformation exactly
     return realBids.map(bid => ({
       ...bid,
-      price: bid.price * 0.80,  // 20% price decay
+      price: bid.price * 0.35,  // 65% price decay
       size: bid.size * 0.03     // Keep only 3% of liquidity
     }));
   }
