@@ -1,4 +1,8 @@
-import type { OrderBookLevel } from '../lib/mock-data';
+export interface OrderBookLevel {
+  price: number;
+  size: number;
+  total: number;
+}
 
 interface OrderBookChartProps {
   levels: OrderBookLevel[];
@@ -6,68 +10,67 @@ interface OrderBookChartProps {
 }
 
 export function OrderBookChart({ levels, isActive }: OrderBookChartProps) {
-  const MAX_LEVELS = 10; // Show only top 10 levels
+  const MAX_LEVELS = 12;
   const displayLevels = levels.slice(0, MAX_LEVELS);
-  const hiddenCount = levels.length - MAX_LEVELS;
-  
-  const maxSize = Math.max(...displayLevels.map(l => l.size), 1);
+  const maxSize = Math.max(...displayLevels.map((l) => l.size), 1);
   const totalDepth = levels.reduce((sum, l) => sum + l.size * l.price, 0);
+  const hiddenCount = levels.length - MAX_LEVELS;
+
+  if (!isActive || displayLevels.length === 0) {
+    return (
+      <div className="space-y-1.5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-zinc-300 w-10 text-right">
+              $0.{Math.round((0.45 - i * 0.03) * 100).toString().padStart(2, '0')}
+            </span>
+            <div className="flex-1 h-5 bg-zinc-100 rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-zinc-200 rounded-sm"
+                style={{ width: `${Math.max(5, 90 - i * 10)}%`, opacity: 0.3 }}
+              />
+            </div>
+          </div>
+        ))}
+        <p className="text-center text-[11px] text-zinc-400 pt-1">
+          Waiting for Polymarket order book...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-white/70">Order Book Depth (Top {MAX_LEVELS})</h3>
-        <span className="text-xs font-mono text-white/40">
-          Total: ${totalDepth.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </span>
-      </div>
-
       {displayLevels.map((level, i) => {
         const widthPercent = (level.size / maxSize) * 100;
-        const intensity = isActive ? Math.max(0.2, 1 - i * 0.07) : 0.15;
+        const intensity = Math.max(0.15, 1 - i * 0.07);
 
         return (
           <div key={level.price} className="flex items-center gap-2 group">
-            {/* Price label */}
-            <span className="text-xs font-mono text-white/50 w-10 text-right shrink-0">
+            <span className="text-[11px] font-mono text-zinc-500 w-10 text-right shrink-0">
               ${level.price.toFixed(2)}
             </span>
-
-            {/* Bar */}
-            <div className="flex-1 h-6 bg-white/[0.03] rounded overflow-hidden relative">
+            <div className="flex-1 h-5 bg-zinc-100 rounded-sm overflow-hidden relative">
               <div
-                className="h-full rounded transition-all duration-1000 ease-out relative"
+                className="h-full rounded-sm transition-all duration-700 ease-out"
                 style={{
                   width: `${widthPercent}%`,
-                  background: isActive
-                    ? `linear-gradient(90deg, rgba(99, 102, 241, ${intensity}) 0%, rgba(99, 102, 241, ${intensity * 0.4}) 100%)`
-                    : `rgba(55, 65, 81, ${intensity})`,
+                  background: `rgba(249, 115, 22, ${intensity * 0.6})`
                 }}
-              >
-                {/* Shimmer effect for active bars */}
-                {isActive && (
-                  <div
-                    className="absolute inset-0 opacity-30"
-                    style={{
-                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Size label inside bar */}
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-white/30 group-hover:text-white/60 transition-colors">
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-mono text-zinc-400 group-hover:text-zinc-600 transition-colors">
                 {level.size.toLocaleString()}
               </span>
             </div>
           </div>
         );
       })}
-      
+
       {hiddenCount > 0 && (
-        <div className="mt-2 text-center text-[10px] text-white/30">
-          + {hiddenCount} more level{hiddenCount === 1 ? '' : 's'} (${(totalDepth - displayLevels.reduce((sum, l) => sum + l.size * l.price, 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })} depth)
-        </div>
+        <p className="text-center text-[10px] text-zinc-400 pt-1">
+          + {hiddenCount} more price level{hiddenCount === 1 ? '' : 's'} ·{' '}
+          ${totalDepth.toLocaleString(undefined, { maximumFractionDigits: 0 })} total depth
+        </p>
       )}
     </div>
   );

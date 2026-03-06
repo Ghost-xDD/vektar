@@ -1,149 +1,100 @@
-import type { ActivityEvent } from '../lib/mock-data';
-import type { ActivityEvent as RealActivityEvent } from '../hooks/useActivityEvents';
-import { shortenHash } from '../lib/mock-data';
-import {
-  ExternalLink,
-  TrendingDown,
-  AlertTriangle,
-  CheckCircle,
-  Play,
-  Activity,
-  Plus,
-  Lock,
-  Unlock,
-} from 'lucide-react';
+import { ExternalLink, TrendingDown, LogOut, CheckCircle2, Activity } from 'lucide-react';
+import type { ActivityEvent } from '../hooks/useActivityEvents';
 
 interface ActivityFeedProps {
-  events: (ActivityEvent | RealActivityEvent)[];
+  events: ActivityEvent[];
 }
 
 function getEventIcon(type: string) {
   switch (type) {
-    case 'ltv_update':
-      return <TrendingDown className="w-3.5 h-3.5 text-accent-bright" />;
-    case 'liquidation':
-      return <AlertTriangle className="w-3.5 h-3.5 text-red-400" />;
-    case 'settlement':
-      return <CheckCircle className="w-3.5 h-3.5 text-[#6366f1]" />;
-    case 'position_opened':
-      return <Plus className="w-3.5 h-3.5 text-green-400" />;
-    case 'collateral_deposited':
-      return <Lock className="w-3.5 h-3.5 text-purple-400" />;
-    case 'collateral_released':
-      return <Unlock className="w-3.5 h-3.5 text-green-400" />;
-    case 'workflow_start':
-      return <Play className="w-3.5 h-3.5 text-green-400" />;
-    case 'health_check':
-      return <Activity className="w-3.5 h-3.5 text-white/30" />;
+    case 'oracle_update':
+      return <TrendingDown className="w-3.5 h-3.5 text-orange-500" />;
+    case 'early_exit':
+      return <LogOut className="w-3.5 h-3.5 text-indigo-500" />;
+    case 'final_settlement':
+      return <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />;
     default:
-      return <Activity className="w-3.5 h-3.5 text-white/30" />;
+      return <Activity className="w-3.5 h-3.5 text-zinc-400" />;
   }
 }
 
-function getEventColor(type: string): string {
+function getEventBorder(type: string): string {
   switch (type) {
-    case 'ltv_update':
-      return 'border-l-indigo-500/50';
-    case 'liquidation':
-      return 'border-l-red-500/50';
-    case 'settlement':
-      return 'border-l-indigo-500/50';
-    case 'position_opened':
-      return 'border-l-green-500/50';
-    case 'collateral_deposited':
-      return 'border-l-purple-500/50';
-    case 'collateral_released':
-      return 'border-l-green-500/50';
-    case 'workflow_start':
-      return 'border-l-green-500/50';
-    case 'health_check':
-      return 'border-l-white/10';
-    default:
-      return 'border-l-white/10';
+    case 'oracle_update':   return 'border-l-orange-300';
+    case 'early_exit':      return 'border-l-indigo-300';
+    case 'final_settlement': return 'border-l-green-300';
+    default:                return 'border-l-zinc-200';
   }
 }
 
-function getExplorerUrl(chain: 'base' | 'polygon', txHash: string): string {
-  return chain === 'base'
-    ? `https://sepolia.basescan.org/tx/${txHash}`
-    : `https://amoy.polygonscan.com/tx/${txHash}`;
-}
-
-function formatTime(date: Date): string {
+function formatTime(date?: Date): string {
+  if (!date) return '';
   return date.toLocaleTimeString('en-US', {
     hour12: false,
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
+    second: '2-digit'
   });
 }
 
 export function ActivityFeed({ events }: ActivityFeedProps) {
   if (events.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-white/20 text-sm">
-        <span>Waiting for CRE workflow to start...</span>
+      <div className="flex flex-col items-center justify-center py-12 text-zinc-400 text-xs gap-2">
+        <Activity className="w-5 h-5 text-zinc-300" />
+        <span>Waiting for CRE workflow to write transactions...</span>
       </div>
     );
   }
 
   return (
     <div className="space-y-0.5 max-h-[320px] overflow-y-auto pr-1">
-      {events.map((event, i) => {
-        // Dim unchanged LTV monitoring events for less visual noise
-        const isUnchanged = event.type === 'ltv_update' && 'hasChange' in event && !event.hasChange;
-        
-        return (
-          <div
-            key={event.id}
-            className={`flex items-start gap-3 px-3 py-2 rounded-md border-l-2 ${getEventColor(event.type)} hover:bg-white/[0.02] transition-colors ${
-              i === 0 ? 'animate-slide-up' : ''
-            } ${isUnchanged ? 'opacity-40' : ''}`}
-          >
-          {/* Icon */}
+      {events.map((event, i) => (
+        <div
+          key={event.id}
+          className={`flex items-start gap-3 px-3 py-2.5 rounded-md border-l-2 ${getEventBorder(event.type)} hover:bg-zinc-50 transition-colors ${
+            i === 0 ? 'animate-slide-up' : ''
+          }`}
+        >
           <div className="mt-0.5 shrink-0">{getEventIcon(event.type)}</div>
 
-          {/* Content */}
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-white/70 truncate">
-              {event.description}
-            </p>
+            <p className="text-[12px] text-zinc-700 leading-snug">{event.description}</p>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] text-white/30 font-mono">
-                {formatTime(event.timestamp)}
-              </span>
-              {event.chain && (
-                <span
-                  className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                  style={{
-                    color: event.chain === 'base' ? '#0052ff' : '#7b3fe4',
-                    background:
-                      event.chain === 'base'
-                        ? 'rgba(0, 82, 255, 0.1)'
-                        : 'rgba(123, 63, 228, 0.1)',
-                  }}
-                >
-                  {event.chain === 'base' ? 'Base' : 'Polygon'}
+              {event.timestamp && (
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  {formatTime(event.timestamp)}
                 </span>
               )}
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${
+                  event.type === 'oracle_update'
+                    ? 'bg-orange-50 text-orange-500'
+                    : event.type === 'early_exit'
+                    ? 'bg-indigo-50 text-indigo-500'
+                    : 'bg-green-50 text-green-600'
+                }`}
+              >
+                {event.type === 'oracle_update'
+                  ? 'Oracle'
+                  : event.type === 'early_exit'
+                  ? 'Exit'
+                  : 'Settlement'}
+              </span>
             </div>
           </div>
 
-          {/* Tx link */}
-          {event.txHash && event.chain && (
-            <a
-              href={getExplorerUrl(event.chain, event.txHash)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-1 text-[10px] text-white/20 hover:text-white/50 transition-colors font-mono mt-0.5"
-            >
-              {shortenHash(event.txHash, 4)}
-              <ExternalLink className="w-2.5 h-2.5" />
-            </a>
-          )}
+          <a
+            href={event.tenderlyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors font-mono mt-0.5"
+          >
+            {event.txHash.slice(0, 6)}...
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
         </div>
-        );
-      })}
+      ))}
     </div>
   );
 }

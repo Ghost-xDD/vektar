@@ -10,7 +10,7 @@
   "base": {
     "chainSelectorName": "ethereum-mainnet-base-1",
     "isTestnet": false,
-    "vaultAddress": "0xbc5502C2086235E1A1Ab7B5A397cE4B327035e97",
+    "vaultAddress": "0x287c88c8c9245daa6a220fef38054fcd174e65c8",
     "gasLimit": "1000000"
   },
   "polymarket": {

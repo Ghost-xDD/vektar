@@ -1,230 +1,111 @@
 import { useQuery } from '@tanstack/react-query';
 import { parseAbiItem } from 'viem';
-import { baseClient, polygonClient } from '../lib/clients';
+import { baseClient } from '../lib/clients';
 
-const VAULT_ADDRESS = import.meta.env.VITE_VAULT_ADDRESS as `0x${string}`;
-const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_ADDRESS as `0x${string}`;
+const VAULT_ADDRESS = import.meta.env.VITE_SETTLEMENT_VAULT_ADDRESS as `0x${string}`;
 const TOKEN_ID = BigInt(import.meta.env.VITE_TOKEN_ID);
+
+export type ActivityEventType = 'oracle_update' | 'early_exit' | 'final_settlement';
 
 export interface ActivityEvent {
   id: string;
-  timestamp: Date;
-  type: 'ltv_update' | 'liquidation' | 'settlement' | 'position_opened' | 'collateral_deposited' | 'collateral_released';
+  type: ActivityEventType;
   description: string;
-  txHash: string;
-  chain: 'base' | 'polygon';
-  oldValue?: number;
-  newValue?: number;
-  user?: string;
-  hasChange?: boolean; 
+  txHash: `0x${string}`;
+  blockNumber: bigint;
+  timestamp?: Date;
+  tenderlyUrl: string;
 }
 
-/**
- * Fetches logs in chunks to work with Alchemy's free tier (10-block limit per request).
- * Fetches up to 500 blocks total (50 requests × 10 blocks = ~15 minutes of history).
- */
-async function fetchLogsInChunks(
-  client: typeof baseClient | typeof polygonClient,
-  contractAddress: `0x${string}`,
-  eventAbi: string,
-  args: any,
-  blocksToFetch: bigint = 500n
-) {
-  const currentBlock = await client.getBlockNumber();
-  const startBlock = currentBlock - blocksToFetch > 0n ? currentBlock - blocksToFetch : 0n;
-  const CHUNK_SIZE = 10n; // Alchemy free tier limit
-  
-  const allLogs = [];
-  
-  // Fetch in 10-block chunks
-  for (let from = startBlock; from <= currentBlock; from += CHUNK_SIZE) {
-    const to = from + CHUNK_SIZE - 1n > currentBlock ? currentBlock : from + CHUNK_SIZE - 1n;
-    
-    try {
-      const logs = await client.getLogs({
-        address: contractAddress,
-        event: parseAbiItem(eventAbi) as any,
-        args,
-        fromBlock: from,
-        toBlock: to
-      });
-      allLogs.push(...logs);
-    } catch (error) {
-      console.warn(`Failed to fetch logs for blocks ${from}-${to}:`, error);
-      // Continue with other chunks even if one fails
-    }
-  }
-  
-  return allLogs;
-}
+const BASE_VNET = '2e625465-6c0e-4577-b01f-790eb8000996';
+
+const tenderlyUrl = (hash: `0x${string}`) =>
+  `https://dashboard.tenderly.co/explorer/vnet/${BASE_VNET}/tx/${hash}`;
 
 export function useActivityEvents() {
   return useQuery<ActivityEvent[]>({
     queryKey: ['events', TOKEN_ID.toString()],
     queryFn: async () => {
       try {
-        // Fetch Base events
-        const [ltvUpdates, liquidations, positionsOpened] = await Promise.all([
-          fetchLogsInChunks(
-            baseClient,
-            VAULT_ADDRESS,
-            'event MarketLTVUpdated(uint256 indexed tokenId, uint256 oldLTV, uint256 newLTV, uint256 timestamp)',
-            { tokenId: TOKEN_ID }
-          ),
-          fetchLogsInChunks(
-            baseClient,
-            VAULT_ADDRESS,
-            'event PositionMarkedLiquidatable(address indexed user, uint256 indexed tokenId)',
-            { tokenId: TOKEN_ID }
-          ),
-          fetchLogsInChunks(
-            baseClient,
-            VAULT_ADDRESS,
-            'event PositionOpened(address indexed user, uint256 indexed tokenId, uint256 collateralAmount, uint256 debtAmount)',
-            { tokenId: TOKEN_ID }
-          )
+        const currentBlock = await baseClient.getBlockNumber();
+        const fromBlock = currentBlock > 2000n ? currentBlock - 2000n : 0n;
+
+        const [oracleUpdates, earlyExits] = await Promise.all([
+          baseClient.getLogs({
+            address: VAULT_ADDRESS,
+            event: parseAbiItem(
+              'event SettlementValueUpdated(uint256 indexed tokenId, uint256 oldValue, uint256 newValue)'
+            ),
+            args: { tokenId: TOKEN_ID },
+            fromBlock,
+            toBlock: 'latest'
+          }),
+          baseClient.getLogs({
+            address: VAULT_ADDRESS,
+            event: parseAbiItem(
+              'event EarlyExitExecuted(address indexed user, uint256 indexed tokenId, uint256 payout)'
+            ),
+            args: { tokenId: TOKEN_ID },
+            fromBlock,
+            toBlock: 'latest'
+          })
         ]);
-        
-        // Fetch Polygon events (collateral locking/releasing)
-        const [collateralDeposited, collateralReleased] = await Promise.all([
-          fetchLogsInChunks(
-            polygonClient,
-            ESCROW_ADDRESS,
-            'event CollateralDeposited(address indexed user, uint256 indexed tokenId, uint256 amount)',
-            { tokenId: TOKEN_ID }
-          ),
-          fetchLogsInChunks(
-            polygonClient,
-            ESCROW_ADDRESS,
-            'event CollateralReleased(address indexed user, uint256 indexed tokenId, uint256 amount)',
-            { tokenId: TOKEN_ID }
-          )
+
+        // Collect unique block numbers to fetch timestamps
+        const blockNums = new Set([
+          ...oracleUpdates.map((l) => l.blockNumber!),
+          ...earlyExits.map((l) => l.blockNumber!)
         ]);
-        
-        console.log('[ActivityFeed] Found events:', {
-          base: { ltvUpdates: ltvUpdates.length, liquidations: liquidations.length, positionsOpened: positionsOpened.length },
-          polygon: { collateralDeposited: collateralDeposited.length, collateralReleased: collateralReleased.length }
-        });
-        
-        // Log sample events for debugging
-        if (collateralDeposited.length > 0) {
-          console.log('[ActivityFeed] Sample Polygon CollateralDeposited:', collateralDeposited[0]);
-        }
-        if (ltvUpdates.length > 0) {
-          console.log('[ActivityFeed] Sample Base LTV update:', ltvUpdates[0]);
-        }
-        
-        // Get block timestamps for Base events
-        const baseBlockNumbers = new Set([
-          ...ltvUpdates.map(log => log.blockNumber),
-          ...liquidations.map(log => log.blockNumber),
-          ...positionsOpened.map(log => log.blockNumber)
-        ]);
-        
-        const blockTimestamps = new Map<bigint, number>();
+        const timestamps = new Map<bigint, Date>();
         await Promise.all(
-          Array.from(baseBlockNumbers).map(async (blockNum) => {
+          Array.from(blockNums).map(async (bn) => {
             try {
-              const block = await baseClient.getBlock({ blockNumber: blockNum });
-              blockTimestamps.set(blockNum, Number(block.timestamp) * 1000);
-            } catch (error) {
-              console.warn(`Failed to fetch Base block ${blockNum}:`, error);
-              blockTimestamps.set(blockNum, Date.now());
+              const block = await baseClient.getBlock({ blockNumber: bn });
+              timestamps.set(bn, new Date(Number(block.timestamp) * 1000));
+            } catch {
+              timestamps.set(bn, new Date());
             }
           })
         );
-        
-        // Get block timestamps for Polygon events
-        const polygonBlockNumbers = new Set([
-          ...collateralDeposited.map(log => log.blockNumber),
-          ...collateralReleased.map(log => log.blockNumber)
-        ]);
-        
-        await Promise.all(
-          Array.from(polygonBlockNumbers).map(async (blockNum) => {
-            try {
-              const block = await polygonClient.getBlock({ blockNumber: blockNum });
-              blockTimestamps.set(blockNum, Number(block.timestamp) * 1000);
-            } catch (error) {
-              console.warn(`Failed to fetch Polygon block ${blockNum}:`, error);
-              blockTimestamps.set(blockNum, Date.now());
-            }
-          })
-        );
-        
-        // Transform to activity events
+
         const events: ActivityEvent[] = [
-          // Base LTV events - show last 10 regardless of change
-          ...(ltvUpdates as any[])
-            .sort((a, b) => Number(b.blockNumber) - Number(a.blockNumber)) // Newest first
-            .slice(0, 10) // Keep last 10
-            .map(log => {
-              const oldLTV = Number(log.args?.oldLTV || 0n);
-              const newLTV = Number(log.args?.newLTV || 0n);
-              const hasChange = oldLTV !== newLTV;
-              
-              return {
-                id: log.transactionHash + '-ltv-' + log.logIndex.toString(),
-                timestamp: new Date(blockTimestamps.get(log.blockNumber) || Date.now()),
-                type: 'ltv_update' as const,
-                description: hasChange 
-                  ? `LTV Updated: ${oldLTV}bps → ${newLTV}bps`
-                  : `LTV Monitored: ${newLTV}bps (stable)`,
-                txHash: log.transactionHash,
-                chain: 'base' as const,
-                oldValue: oldLTV,
-                newValue: newLTV,
-                hasChange
-              };
-            }),
-          ...(liquidations as any[]).map(log => ({
-            id: log.transactionHash + '-liq-' + log.logIndex.toString(),
-            timestamp: new Date(blockTimestamps.get(log.blockNumber) || Date.now()),
-            type: 'liquidation' as const,
-            description: `Position marked liquidatable`,
-            txHash: log.transactionHash,
-            chain: 'base' as const,
-            user: log.args?.user as string
-          })),
-          ...(positionsOpened as any[]).map(log => ({
-            id: log.transactionHash + '-pos-' + log.logIndex.toString(),
-            timestamp: new Date(blockTimestamps.get(log.blockNumber) || Date.now()),
-            type: 'position_opened' as const,
-            description: `Position opened: ${Number(log.args?.collateralAmount || 0n) / 1e18} shares, $${Number(log.args?.debtAmount || 0n) / 1e6} debt`,
-            txHash: log.transactionHash,
-            chain: 'base' as const,
-            user: log.args?.user as string
-          })),
-          // Polygon events
-          ...(collateralDeposited as any[]).map(log => ({
-            id: log.transactionHash + '-dep-' + log.logIndex.toString(),
-            timestamp: new Date(blockTimestamps.get(log.blockNumber) || Date.now()),
-            type: 'collateral_deposited' as const,
-            description: `Collateral locked: ${Number(log.args?.amount || 0n) / 1e18} shares on Polygon`,
-            txHash: log.transactionHash,
-            chain: 'polygon' as const,
-            user: log.args?.user as string
-          })),
-          ...(collateralReleased as any[]).map(log => ({
-            id: log.transactionHash + '-rel-' + log.logIndex.toString(),
-            timestamp: new Date(blockTimestamps.get(log.blockNumber) || Date.now()),
-            type: 'collateral_released' as const,
-            description: `Collateral released: ${Number(log.args?.amount || 0n) / 1e18} shares from Polygon`,
-            txHash: log.transactionHash,
-            chain: 'polygon' as const,
-            user: log.args?.user as string
-          }))
+          ...oracleUpdates.map((log) => {
+            const newVal = Number((log.args as any).newValue ?? 0n) / 1e6;
+            const oldVal = Number((log.args as any).oldValue ?? 0n) / 1e6;
+            return {
+              id: `${log.transactionHash}-${log.logIndex}`,
+              type: 'oracle_update' as const,
+              description:
+                oldVal > 0
+                  ? `Oracle: $${newVal.toFixed(4)}/share (was $${oldVal.toFixed(4)})`
+                  : `Oracle: $${newVal.toFixed(4)}/share (first update)`,
+              txHash: log.transactionHash!,
+              blockNumber: log.blockNumber!,
+              timestamp: timestamps.get(log.blockNumber!),
+              tenderlyUrl: tenderlyUrl(log.transactionHash!)
+            };
+          }),
+          ...earlyExits.map((log) => {
+            const payout = Number((log.args as any).payout ?? 0n) / 1e6;
+            return {
+              id: `${log.transactionHash}-${log.logIndex}`,
+              type: 'early_exit' as const,
+              description: `Early exit: $${payout.toFixed(2)} USDC → private payout routing`,
+              txHash: log.transactionHash!,
+              blockNumber: log.blockNumber!,
+              timestamp: timestamps.get(log.blockNumber!),
+              tenderlyUrl: tenderlyUrl(log.transactionHash!)
+            };
+          })
         ];
-        
-        // Sort by timestamp descending (newest first)
-        return events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      } catch (error) {
-        console.error('Error fetching activity events:', error);
-        // Return empty array on error instead of throwing
+
+        return events.sort((a, b) => Number(b.blockNumber - a.blockNumber));
+      } catch (err) {
+        console.error('Error fetching activity events:', err);
         return [];
       }
     },
-    refetchInterval: 12000, // Poll every 12 seconds (matches CRE cycle)
+    refetchInterval: 12000,
     staleTime: 10000,
     retry: 2
   });

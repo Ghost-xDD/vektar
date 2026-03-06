@@ -152,6 +152,8 @@ contract SettlementVault {
 
     /// @notice User calls this to exit at the oracle's current settlement value.
     ///         Pays out USDC immediately from the pool. CRE then releases collateral on Polygon.
+    /// @dev settlementValueUSDC is the per-share fair exit price (USDC, 6 decimals).
+    ///      Payout = user's share count × per-share oracle price.
     function earlyExit(uint256 tokenId) external {
         Position storage pos = positions[msg.sender][tokenId];
         if (pos.shares == 0) revert NoPosition();
@@ -161,7 +163,8 @@ contract SettlementVault {
         if (!oracle.active || oracle.settlementValueUSDC == 0) revert OracleNotReady();
         if (block.timestamp - oracle.lastUpdated > ORACLE_STALENESS_THRESHOLD * 12) revert OracleStale();
 
-        uint256 payout = oracle.settlementValueUSDC;
+        // Per-share price × user's shares. CTF shares are whole units (no decimals).
+        uint256 payout = pos.shares * oracle.settlementValueUSDC;
         pos.settled = true;
         pos.paidOutUSDC = payout;
 
@@ -181,9 +184,11 @@ contract SettlementVault {
 
         uint256 poolPayout = 0;
         if (outcome == 1) {
-            // YES wins: each share redeems for $1.00 on Polymarket.
-            // Pool profit = (shares × $1) − what was already paid to the user.
-            poolPayout = pos.shares * 1e6 - pos.paidOutUSDC;
+            // YES wins: each share redeems for $1.00 (1e6 USDC) on Polymarket.
+            // Pool profit = (shares × $1.00) − USDC already paid out on earlyExit().
+            // paidOutUSDC = shares × perShareOraclePrice, so profit = shares × (1e6 − perShareOraclePrice).
+            uint256 fullRedemption = pos.shares * 1e6;
+            poolPayout = fullRedemption > pos.paidOutUSDC ? fullRedemption - pos.paidOutUSDC : 0;
         }
         // NO wins: shares are worthless. Loss is bounded by the safety margin built into the oracle.
 

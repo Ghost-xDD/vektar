@@ -1,176 +1,131 @@
-import type { Position } from '../lib/mock-data';
-import { Layers, ArrowRightLeft, ExternalLink } from 'lucide-react';
+import { Layers, Shield, Circle } from 'lucide-react';
+import { ResetPositionButton } from './ResetPositionButton';
 
 interface PositionCardProps {
-  position: Position;
-  isActive: boolean;
-  collateralValueUsd: number;
+  userAddress: `0x${string}` | null;
+  shares: number;
+  settled: boolean;
+  polygonAddress: `0x${string}` | null;
+  shieldedAddress: `0x${string}` | null;
+  newShieldedAddress?: `0x${string}` | null;
+  lockedShares: number;
+  hasPosition: boolean;
+  isLoading: boolean;
+  isConnected: boolean;
+  isCorrectChain: boolean;
 }
 
-function getStatusConfig(status: Position['status']) {
-  switch (status) {
-    case 'active':
-      return {
-        label: 'Active',
-        color: '#10b981',
-        bg: 'rgba(16, 185, 129, 0.1)',
-        border: 'rgba(16, 185, 129, 0.2)',
-      };
-    case 'warning':
-      return {
-        label: 'Warning',
-        color: '#f59e0b',
-        bg: 'rgba(245, 158, 11, 0.1)',
-        border: 'rgba(245, 158, 11, 0.2)',
-      };
-    case 'liquidatable':
-      return {
-        label: 'LIQUIDATABLE',
-        color: '#ef4444',
-        bg: 'rgba(239, 68, 68, 0.1)',
-        border: 'rgba(239, 68, 68, 0.3)',
-      };
-    case 'settled':
-      return {
-        label: 'SETTLED',
-        color: '#10b981',
-        bg: 'rgba(16, 185, 129, 0.15)',
-        border: 'rgba(16, 185, 129, 0.35)',
-      };
-    default:
-      return {
-        label: 'N/A',
-        color: '#6b7280',
-        bg: 'transparent',
-        border: 'transparent',
-      };
-  }
+function truncateAddr(addr: string) {
+  return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
+}
+
+function getStatus(settled: boolean, hasPosition: boolean) {
+  if (settled) return { label: 'Exited', color: 'text-zinc-500', bg: 'bg-zinc-100', dot: 'bg-zinc-400' };
+  if (hasPosition) return { label: 'Active', color: 'text-green-600', bg: 'bg-green-50', dot: 'bg-green-500' };
+  return { label: 'No position', color: 'text-zinc-400', bg: 'bg-zinc-50', dot: 'bg-zinc-300' };
 }
 
 export function PositionCard({
-  position,
-  isActive,
-  collateralValueUsd,
+  userAddress,
+  shares,
+  settled,
+  polygonAddress,
+  shieldedAddress,
+  newShieldedAddress,
+  lockedShares,
+  hasPosition,
+  isLoading,
+  isConnected,
+  isCorrectChain
 }: PositionCardProps) {
-  const statusConfig = getStatusConfig(position.status);
+  const status = getStatus(settled, hasPosition);
+  const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-white/70">Active Position</h3>
-        {isActive && (
-          <span
-            className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${
-              position.status === 'liquidatable' ? 'animate-pulse' : ''
-            } ${position.status === 'settled' ? 'ring-2 ring-green-400/40' : ''}`}
-            style={{
-              color: statusConfig.color,
-              background: statusConfig.bg,
-              border: `1px solid ${statusConfig.border}`,
-            }}
-          >
-            {statusConfig.label}
+        <h3 className="text-sm font-semibold text-zinc-900">Position</h3>
+        <span
+          className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${status.bg} ${status.color}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+          {status.label}
+        </span>
+      </div>
+
+      {/* Market info */}
+      <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 space-y-2">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-zinc-500">Market</span>
+          <span className="font-medium text-zinc-800">BTC $100k YES</span>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-zinc-500">Shares locked</span>
+          <span className="font-semibold font-mono text-zinc-900">
+            {isLoading ? '...' : (shares > 0 ? shares.toLocaleString() : lockedShares.toLocaleString())}
           </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1">
+            <Layers className="w-3 h-3 text-[#7b3fe4]" />
+            <span className="text-zinc-500">Escrow chain</span>
+          </div>
+          <span className="text-[#7b3fe4] font-medium">Polygon</span>
+        </div>
+      </div>
+
+      {/* Addresses */}
+      <div className="space-y-2">
+        {polygonAddress && polygonAddress !== ZERO_ADDR && (
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-zinc-400">Polygon address</span>
+            <span className="text-[11px] font-mono text-zinc-600">
+              {truncateAddr(polygonAddress)}
+            </span>
+          </div>
+        )}
+
+        {shieldedAddress && shieldedAddress !== ZERO_ADDR && (
+          <div className="bg-orange-50/60 border border-orange-100 rounded-lg p-2.5 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <Shield className="w-3 h-3 text-orange-500" />
+              <span className="text-[11px] font-medium text-orange-600">Shielded address</span>
+            </div>
+            <p className="text-[11px] font-mono text-zinc-700">{truncateAddr(shieldedAddress)}</p>
+            <p className="text-[10px] text-zinc-400">Private payout routes here via CRE</p>
+          </div>
+        )}
+
+        {(!shieldedAddress || shieldedAddress === ZERO_ADDR) && !isLoading && (
+          <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+            <Circle className="w-3 h-3" />
+            <span>No shielded address registered yet</span>
+          </div>
         )}
       </div>
 
-      {/* Position details: Collateral (Yes shares) + Debt (USDC) with chain labels */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Collateral */}
-        <div className="bg-white/[0.02] rounded-lg p-3 border border-white/[0.04]">
-          <div className="flex items-center gap-1.5 mb-2">
-            <div className="w-4 h-4 rounded-full bg-[#7b3fe4]/20 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-[#7b3fe4]" />
-            </div>
-            <span className="text-[10px] text-white/40 uppercase tracking-wider">
-              Collateral
-            </span>
+      {/* Settled state + reset */}
+      {settled && (
+        <div className="space-y-3">
+          <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-center">
+            <p className="text-[12px] text-zinc-600 font-medium">Position exited via earlyExit()</p>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              USDC paid out · private payout completed
+            </p>
           </div>
-          <p className="text-lg font-semibold font-mono text-white/90">
-            {position.collateralShares.toLocaleString()}
-          </p>
-          <p className="text-xs text-white/40">
-            Yes shares (${collateralValueUsd.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
-          </p>
-          <p className="text-[10px] text-[#7b3fe4]/70 mt-1 font-mono">
-            Polygon Amoy
-          </p>
-        </div>
-
-        {/* Debt */}
-        <div className="bg-white/[0.02] rounded-lg p-3 border border-white/[0.04]">
-          <div className="flex items-center gap-1.5 mb-2">
-            <div className="w-4 h-4 rounded-full bg-[#0052ff]/20 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-[#0052ff]" />
-            </div>
-            <span className="text-[10px] text-white/40 uppercase tracking-wider">
-              Debt
-            </span>
-          </div>
-          <p className="text-lg font-semibold font-mono text-white/90">
-            ${position.debtUsd.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </p>
-          <p className="text-xs text-white/40">USDC borrowed</p>
-          <p className="text-[10px] text-[#0052ff]/70 mt-1 font-mono">
-            Base Sepolia
-          </p>
-        </div>
-      </div>
-
-      {/* Cross-chain indicator */}
-      <div className="flex items-center justify-center gap-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <Layers className="w-3 h-3 text-[#7b3fe4]" />
-          <span className="text-[10px] text-white/40">Polygon</span>
-        </div>
-        <ArrowRightLeft className="w-3.5 h-3.5 text-white/20" />
-        <div className="flex items-center gap-1.5">
-          <Layers className="w-3 h-3 text-[#0052ff]" />
-          <span className="text-[10px] text-white/40">Base</span>
-        </div>
-      </div>
-
-      {/* Settlement info (shown when settled) — all inferred from on-chain: debt=0, locked=0 */}
-      {position.status === 'settled' && (
-        <div className="bg-green-500/5 rounded-lg p-3 border border-green-500/20">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-semibold text-green-400">
-              Settlement complete
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-3 text-xs">
-            <span className="text-[10px] text-green-400/80 flex items-center gap-1">
-              Base: debt cleared <span className="text-green-400">&#10003;</span>
-            </span>
-            <span className="text-[10px] text-green-400/80 flex items-center gap-1">
-              Polygon: collateral released <span className="text-green-400">&#10003;</span>
-            </span>
+          <div className="border-t border-zinc-100 pt-3">
+            <p className="text-[10px] text-zinc-400 mb-2 text-center uppercase tracking-wide font-medium">Demo reset</p>
+            <ResetPositionButton
+              userAddress={userAddress}
+              polygonAddress={polygonAddress}
+              shieldedAddress={shieldedAddress}
+              newShieldedAddress={newShieldedAddress}
+              isConnected={isConnected}
+              isCorrectChain={isCorrectChain}
+            />
           </div>
         </div>
       )}
-
-      {/* Explorer links */}
-      <div className="flex gap-2">
-        <a
-          href="https://sepolia.basescan.org"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 flex items-center justify-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors py-1.5 rounded border border-white/[0.04] hover:border-white/10"
-        >
-          <ExternalLink className="w-3 h-3" />
-          Basescan
-        </a>
-        <a
-          href="https://amoy.polygonscan.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 flex items-center justify-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors py-1.5 rounded border border-white/[0.04] hover:border-white/10"
-        >
-          <ExternalLink className="w-3 h-3" />
-          Polygonscan
-        </a>
-      </div>
     </div>
   );
 }

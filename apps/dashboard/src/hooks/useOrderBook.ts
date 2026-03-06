@@ -169,15 +169,10 @@ export function useOrderBook() {
     refetchInterval: 12000, // Poll every 12 seconds (matches CRE cycle)
     staleTime: 10000,
     retry: (failureCount, error) => {
-      // Don't retry on 404 - token doesn't exist
       if (error instanceof Error && error.message.includes('404')) {
         return false;
       }
       return failureCount < 2;
-    },
-    // Gracefully handle errors - fall back to mock data
-    onError: (error) => {
-      console.warn('Order book fetch failed, dashboard will use fallback data:', error);
     }
   });
 }

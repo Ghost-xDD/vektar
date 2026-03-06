@@ -78,15 +78,19 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
         }
       );
 
-      // Exit value = VWAP × total bid depth (USDC 6 decimals), with safety margin applied
-      const calculatedExitValue = ltvResult.vwap * totalBidDepth * runtime.config.ltv.safetyMargin;
-      const settlementValueUSDC = Math.max(0, Math.floor(calculatedExitValue * 1_000_000));
+      // Per-share exit price = VWAP × safetyMargin (in USDC, 6 decimals).
+      // earlyExit() multiplies this by pos.shares to get the user's total payout.
+      // Storing per-share lets getSettlementValue() serve as a public oracle
+      // consumable by any external protocol — total-market values are meaningless externally.
+      const perShareExitPrice = ltvResult.vwap * runtime.config.ltv.safetyMargin;
+      const settlementValueUSDC = Math.max(0, Math.floor(perShareExitPrice * 1_000_000));
 
       runtime.log(`[COMPUTE] VWAP:              $${ltvResult.vwap.toFixed(4)}/share`);
-      runtime.log(`[COMPUTE] Bid depth:         $${totalBidDepth.toFixed(2)}`);
+      runtime.log(`[COMPUTE] Bid depth:         $${totalBidDepth.toFixed(2)} (order book depth — for LTV ref only)`);
       runtime.log(`[COMPUTE] Safety margin:     ${(runtime.config.ltv.safetyMargin * 100).toFixed(0)}%`);
-      runtime.log(`[COMPUTE] Settlement value:  $${(settlementValueUSDC / 1_000_000).toFixed(2)} USDC`);
-      runtime.log(`[COMPUTE] (spot price says:  $${(market.spotPrice * Number(totalLocked) / 1e18).toFixed(2)} — liquidity illusion gap)`);
+      runtime.log(`[COMPUTE] Per-share price:   $${perShareExitPrice.toFixed(6)}/share`);
+      runtime.log(`[COMPUTE] Oracle value:      ${settlementValueUSDC} (USDC 6-dec per share)`);
+      runtime.log(`[COMPUTE] Spot price:        $${market.spotPrice.toFixed(4)}/share — oracle is ${((1 - perShareExitPrice / market.spotPrice) * 100).toFixed(1)}% below spot (liquidity discount)`);
 
       runtime.log(`[EVM WRITE] Base → SettlementVault.updateSettlementValue(${settlementValueUSDC})`);
       const txHash = updateSettlementValue(runtime, market.tokenId, settlementValueUSDC);
