@@ -1,4 +1,5 @@
 import { Zap, ExternalLink, BarChart2, Activity, Droplets } from 'lucide-react';
+import { LOGOS } from './lib/logos';
 import { Link } from 'react-router-dom';
 
 const BASE_EXPLORER = 'https://dashboard.tenderly.co/explorer/vnet/2e625465-6c0e-4577-b01f-790eb8000996';
@@ -9,6 +10,7 @@ import { useOrderBook, type OrderBookLevel } from './hooks/useOrderBook';
 import { useActivityEvents } from './hooks/useActivityEvents';
 import { useEarlyExit } from './hooks/useEarlyExit';
 import { useShieldedAddress } from './hooks/useShieldedAddress';
+import { useRegisterPosition } from './hooks/useRegisterPosition';
 import { useEventWatcher } from './hooks/useEventWatcher';
 import { useWallet } from './hooks/useWallet';
 import { SettlementOracle } from './components/SettlementOracle';
@@ -32,6 +34,7 @@ export default function App() {
   const { data: events = [] } = useActivityEvents();
   const earlyExit = useEarlyExit();
   const shieldedAddr = useShieldedAddress();
+  const registerPosition = useRegisterPosition();
 
   const spotPrice = orderBook?.bids?.[0]?.price ?? 0;
 
@@ -82,16 +85,19 @@ export default function App() {
                 name="Base Fork"
                 color="#0052ff"
                 isConnected={!!settlement?.isActive}
+                logoUrl={LOGOS.base}
               />
               <NetworkBadge
                 name="Polygon Fork"
                 color="#7b3fe4"
                 isConnected={!!position?.hasPosition}
+                logoUrl={LOGOS.polygon}
               />
               <NetworkBadge
                 name="Polymarket CLOB"
                 color="#f97316"
                 isConnected={!!orderBook}
+                logoUrl={LOGOS.polymarket}
               />
             </div>
 
@@ -131,7 +137,8 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">
+                  <img src={LOGOS.polymarket} alt="" className="w-3 h-3 rounded object-contain" />
                   Polymarket
                 </span>
                 <span className="text-[10px] text-zinc-400">$673k volume</span>
@@ -266,13 +273,17 @@ export default function App() {
           <div className="rounded-2xl border border-zinc-200 bg-white/80 backdrop-blur-sm p-5 shadow-sm">
             <ShieldedAddressCard
               shieldedAddress={shieldedAddr.shieldedAddress}
-              shieldedKey={shieldedAddr.shieldedKey}
+              generateState={shieldedAddr.state}
+              generateError={shieldedAddr.error}
               registeredAddress={
                 position?.shieldedAddress !== ZERO_ADDR
                   ? position?.shieldedAddress
                   : null
               }
+              registerState={registerPosition.state}
+              registerError={registerPosition.error}
               onGenerate={shieldedAddr.generate}
+              onRegister={() => registerPosition.register(shieldedAddr.shieldedAddress ?? undefined)}
             />
           </div>
         </div>
@@ -309,8 +320,8 @@ export default function App() {
               rel="noopener noreferrer"
               className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-[#7b3fe4]/[0.04] border border-[#7b3fe4]/15 min-w-[160px] text-center hover:bg-[#7b3fe4]/[0.07] transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-[#7b3fe4]/10 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-[#7b3fe4]" />
+              <div className="w-8 h-8 rounded-full bg-[#7b3fe4]/10 flex items-center justify-center overflow-hidden">
+                <img src={LOGOS.polygon} alt="" className="w-5 h-5 object-contain" />
               </div>
               <span className="text-xs font-semibold text-[#7b3fe4]">Polygon</span>
               <span className="text-[10px] text-zinc-500">CollateralEscrow</span>
@@ -357,8 +368,8 @@ export default function App() {
               rel="noopener noreferrer"
               className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-[#0052ff]/[0.03] border border-[#0052ff]/10 min-w-[160px] text-center hover:bg-[#0052ff]/[0.06] transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-[#0052ff]/10 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-[#0052ff]" />
+              <div className="w-8 h-8 rounded-full bg-[#0052ff]/10 flex items-center justify-center overflow-hidden">
+                <img src={LOGOS.base} alt="" className="w-5 h-5 object-contain" />
               </div>
               <span className="text-xs font-semibold text-[#0052ff]">Base</span>
               <span className="text-[10px] text-zinc-500">SettlementVault</span>

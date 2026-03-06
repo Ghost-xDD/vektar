@@ -1,4 +1,5 @@
 import { Layers, Shield, Circle } from 'lucide-react';
+import { LOGOS } from '../lib/logos';
 import { ResetPositionButton } from './ResetPositionButton';
 
 interface PositionCardProps {
@@ -67,7 +68,7 @@ export function PositionCard({
         </div>
         <div className="flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-1">
-            <Layers className="w-3 h-3 text-[#7b3fe4]" />
+            <img src={LOGOS.polygon} alt="" className="w-3 h-3 rounded object-contain" />
             <span className="text-zinc-500">Escrow chain</span>
           </div>
           <span className="text-[#7b3fe4] font-medium">Polygon</span>

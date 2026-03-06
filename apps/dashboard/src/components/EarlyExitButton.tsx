@@ -51,7 +51,8 @@ export function EarlyExitButton({
 
   const exitValue = paidOutUSDC ?? totalExitUSDC;
 
-  if (isSettled) {
+  // Only show "Position Settled" when idle — don't override active flow (pending → confirmed → routing)
+  if (isSettled && state === 'idle') {
     return (
       <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-center space-y-2">
         <div className="flex items-center justify-center gap-2">
@@ -112,14 +113,16 @@ export function EarlyExitButton({
         </div>
       )}
 
-      {/* Pending tx */}
+      {/* Pending tx — waiting for on-chain confirmation */}
       {state === 'pending_tx' && (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 space-y-3">
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-zinc-500 animate-spin" />
             <div>
-              <p className="text-sm font-semibold text-zinc-800">Sending transaction...</p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">Signing earlyExit(tokenId) on Base</p>
+              <p className="text-sm font-semibold text-zinc-800">Waiting for confirmation</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">
+                Sign in MetaMask · then confirming on-chain
+              </p>
             </div>
           </div>
         </div>

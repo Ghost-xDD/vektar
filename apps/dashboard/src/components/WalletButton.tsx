@@ -1,5 +1,6 @@
 import { Wallet, AlertTriangle, Loader2 } from 'lucide-react';
 import { useWallet } from '../hooks/useWallet';
+import { LOGOS } from '../lib/logos';
 
 function shortenAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -39,7 +40,7 @@ export function WalletButton() {
 
   return (
     <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-zinc-50 border border-zinc-200">
-      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse-dot" />
+      <img src={LOGOS.base} alt="" className="w-4 h-4 rounded-full object-contain shrink-0" />
       <span className="text-sm font-mono text-zinc-700">{shortenAddr(address)}</span>
       <span className="text-[10px] text-zinc-400 hidden sm:inline">Base Fork</span>
     </div>

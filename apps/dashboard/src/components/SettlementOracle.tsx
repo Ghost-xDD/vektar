@@ -1,4 +1,5 @@
 import { TrendingDown, Clock, Wifi, WifiOff } from 'lucide-react';
+import { LOGOS } from '../lib/logos';
 
 interface SettlementOracleProps {
   perShareUSDC: number;
@@ -87,7 +88,10 @@ export function SettlementOracle({
           <p className="text-base font-semibold font-mono text-zinc-800">
             {spotPrice > 0 ? `$${spotPrice.toFixed(3)}` : '—'}
           </p>
-          <p className="text-[10px] text-zinc-400">Polymarket top bid</p>
+          <p className="text-[10px] text-zinc-400 flex items-center gap-1">
+            <img src={LOGOS.polymarket} alt="" className="w-2.5 h-2.5 rounded object-contain" />
+            Polymarket top bid
+          </p>
         </div>
 
         <div

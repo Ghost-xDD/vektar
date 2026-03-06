@@ -1,4 +1,5 @@
 import { Droplets, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { LOGOS } from '../lib/logos';
 import { useFaucet, type ClaimStatus } from '../hooks/useFaucet';
 
 interface FaucetCardProps {
@@ -63,7 +64,8 @@ export function FaucetCard({ address, isCorrectChain }: FaucetCardProps) {
       <div className="flex items-center gap-2">
         <Droplets className="w-4 h-4 text-zinc-400" />
         <h3 className="text-sm font-semibold text-zinc-900">Faucet</h3>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 border border-zinc-200 font-medium">
+        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 border border-zinc-200 font-medium">
+          <img src={LOGOS.base} alt="" className="w-3 h-3 rounded object-contain" />
           Base Fork
         </span>
       </div>
