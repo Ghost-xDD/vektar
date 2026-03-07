@@ -12,6 +12,7 @@ interface PositionCardProps {
   newShieldedAddress?: `0x${string}` | null;
   lockedShares: number;
   hasPosition: boolean;
+  privatePayoutComplete?: boolean;
   isLoading: boolean;
   isConnected: boolean;
   isCorrectChain: boolean;
@@ -21,9 +22,15 @@ function truncateAddr(addr: string) {
   return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
 }
 
-function getStatus(settled: boolean, hasPosition: boolean, isFinallySettled?: boolean) {
+function getStatus(
+  settled: boolean,
+  hasPosition: boolean,
+  isFinallySettled?: boolean,
+  privatePayoutComplete?: boolean
+) {
   if (settled && isFinallySettled) return { label: 'Settled', color: 'text-green-700', bg: 'bg-green-50', dot: 'bg-green-500' };
-  if (settled) return { label: 'Exited', color: 'text-indigo-600', bg: 'bg-indigo-50', dot: 'bg-indigo-400' };
+  if (settled && privatePayoutComplete) return { label: 'Exited', color: 'text-indigo-600', bg: 'bg-indigo-50', dot: 'bg-indigo-400' };
+  if (settled) return { label: 'Exiting', color: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-500' };
   if (hasPosition) return { label: 'Active', color: 'text-green-600', bg: 'bg-green-50', dot: 'bg-green-500' };
   return { label: 'No position', color: 'text-zinc-400', bg: 'bg-zinc-50', dot: 'bg-zinc-300' };
 }
@@ -38,11 +45,13 @@ export function PositionCard({
   newShieldedAddress,
   lockedShares,
   hasPosition,
+  privatePayoutComplete,
   isLoading,
   isConnected,
   isCorrectChain
 }: PositionCardProps) {
-  const status = getStatus(settled, hasPosition, isFinallySettled);
+  const status = getStatus(settled, hasPosition, isFinallySettled, privatePayoutComplete);
+  const showExitedState = settled && (isFinallySettled || !!privatePayoutComplete);
   const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
   return (
@@ -64,9 +73,9 @@ export function PositionCard({
           <span className="font-medium text-zinc-800">BTC $100k YES</span>
         </div>
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-zinc-500">{settled ? 'Shares redeemed' : 'Shares locked'}</span>
-          <span className={`font-semibold font-mono ${settled ? 'text-zinc-400 line-through' : 'text-zinc-900'}`}>
-            {isLoading ? '...' : settled ? '0' : (shares > 0 ? shares.toLocaleString() : lockedShares.toLocaleString())}
+          <span className="text-zinc-500">{showExitedState ? 'Shares redeemed' : 'Shares locked'}</span>
+          <span className={`font-semibold font-mono ${showExitedState ? 'text-zinc-400 line-through' : 'text-zinc-900'}`}>
+            {isLoading ? '...' : showExitedState ? '0' : (shares > 0 ? shares.toLocaleString() : lockedShares.toLocaleString())}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px]">
@@ -108,17 +117,35 @@ export function PositionCard({
         )}
       </div>
 
-      {/* Settled state + reset */}
+      {/* Settlement / private payout state + reset */}
       {settled && (
         <div className="space-y-3">
-          <div className={`border rounded-lg p-3 text-center ${isFinallySettled ? 'bg-green-50 border-green-200' : 'bg-indigo-50/60 border-indigo-100'}`}>
-            <p className={`text-[12px] font-medium ${isFinallySettled ? 'text-green-700' : 'text-indigo-700'}`}>
-              {isFinallySettled ? 'Market resolved · position settled on-chain' : 'Position exited via earlyExit()'}
+          <div className={`border rounded-lg p-3 text-center ${
+            isFinallySettled
+              ? 'bg-green-50 border-green-200'
+              : showExitedState
+                ? 'bg-indigo-50/60 border-indigo-100'
+                : 'bg-amber-50 border-amber-200'
+          }`}>
+            <p className={`text-[12px] font-medium ${
+              isFinallySettled
+                ? 'text-green-700'
+                : showExitedState
+                  ? 'text-indigo-700'
+                  : 'text-amber-700'
+            }`}>
+              {isFinallySettled
+                ? 'Market resolved · position settled on-chain'
+                : showExitedState
+                  ? 'Position exited via earlyExit()'
+                  : 'Early exit confirmed · private payout pending'}
             </p>
             <p className="text-[11px] text-zinc-400 mt-0.5">
               {isFinallySettled
                 ? 'UMA oracle resolved · CRE wrote Base + Polygon'
-                : 'USDC paid out · private payout completed'}
+                : showExitedState
+                  ? 'USDC paid out · private payout completed'
+                  : 'Waiting for private payout completion action'}
             </p>
           </div>
           <div className="border-t border-zinc-100 pt-3">

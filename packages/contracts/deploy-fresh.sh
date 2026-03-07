@@ -250,14 +250,14 @@ echo "✅ Escrow: $ESCROW_ADDRESS"
 echo ""
 
 # ============================================================
-# STEP 3: Deploy HorizonVault on Base (Demo Mode)
+# STEP 3: Deploy SettlementVault on Base (Demo Mode)
 # ============================================================
 echo "=========================================="
-echo "Step 3/8: Deploy HorizonVault (Base)"
+echo "Step 3/8: Deploy SettlementVault (Base)"
 echo "=========================================="
-export MAX_LTV_INCREASE_PER_UPDATE=10000
-VAULT_ADDRESS=$(forge_deploy script/DeployBase.s.sol "$BASE_SEPOLIA_RPC_URL" "HorizonVault")
-echo "✅ Vault: $VAULT_ADDRESS (demo mode: 10000 bps)"
+export MAX_VALUE_INCREASE_PER_UPDATE_BPS=10000
+VAULT_ADDRESS=$(forge_deploy script/DeployBase.s.sol "$BASE_SEPOLIA_RPC_URL" "SettlementVault")
+echo "✅ Vault: $VAULT_ADDRESS (demo mode oracle cap: 10000 bps)"
 echo ""
 
 # ============================================================

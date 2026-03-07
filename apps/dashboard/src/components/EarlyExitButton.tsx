@@ -10,7 +10,10 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { ExitState } from '../hooks/useEarlyExit';
-import type { BalanceState, ConvergenceBalance } from '../hooks/useConvergenceBalance';
+import type {
+  BalanceState,
+  ConvergenceBalance,
+} from '../hooks/useConvergenceBalance';
 
 interface EarlyExitButtonProps {
   state: ExitState;
@@ -71,10 +74,14 @@ export function EarlyExitButton({
       <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-center space-y-2">
         <div className="flex items-center justify-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
-          <span className="text-sm font-semibold text-green-700">Position Settled</span>
+          <span className="text-sm font-semibold text-green-700">
+            Position Settled
+          </span>
         </div>
         {paidOutUSDC !== null && (
-          <p className="text-xs text-green-600 font-mono">${paidOutUSDC.toFixed(2)} USDC paid out</p>
+          <p className="text-xs text-green-600 font-mono">
+            ${paidOutUSDC.toFixed(2)} USDC paid out
+          </p>
         )}
       </div>
     );
@@ -104,18 +111,29 @@ export function EarlyExitButton({
           {/* Subtext */}
           <div className="text-center space-y-1">
             {!isConnected ? (
-              <p className="text-[11px] text-zinc-400">Connect wallet to exit</p>
+              <p className="text-[11px] text-zinc-400">
+                Connect wallet to exit
+              </p>
             ) : !isCorrectChain ? (
-              <p className="text-[11px] text-amber-600">Switch to Base Tenderly Fork first</p>
+              <p className="text-[11px] text-amber-600">
+                Switch to Base Tenderly Fork first
+              </p>
             ) : isOracleStale ? (
-              <p className="text-[11px] text-amber-600">⚠ Oracle stale — wait for next CRE cycle</p>
+              <p className="text-[11px] text-amber-600">
+                ⚠ Oracle stale — wait for next CRE cycle
+              </p>
             ) : !isOracleActive ? (
-              <p className="text-[11px] text-zinc-400">Waiting for first oracle update...</p>
+              <p className="text-[11px] text-zinc-400">
+                Waiting for first oracle update...
+              </p>
             ) : !hasShares ? (
-              <p className="text-[11px] text-zinc-400">No registered shares to exit yet</p>
+              <p className="text-[11px] text-zinc-400">
+                No registered shares to exit yet
+              </p>
             ) : (
               <p className="text-[11px] text-zinc-400">
-                Signs earlyExit(tokenId) on Base · USDC paid from pool immediately
+                Signs earlyExit(tokenId) on Base · USDC paid from pool
+                immediately
               </p>
             )}
           </div>
@@ -135,7 +153,9 @@ export function EarlyExitButton({
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-zinc-500 animate-spin" />
             <div>
-              <p className="text-sm font-semibold text-zinc-800">Waiting for confirmation</p>
+              <p className="text-sm font-semibold text-zinc-800">
+                Waiting for confirmation
+              </p>
               <p className="text-[11px] text-zinc-500 mt-0.5">
                 Sign in MetaMask · then confirming on-chain
               </p>
@@ -200,7 +220,9 @@ export function EarlyExitButton({
           <div className="flex items-center gap-2.5">
             <Shield className="w-5 h-5 text-green-600 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-green-800">Private payout complete</p>
+              <p className="text-sm font-semibold text-green-800">
+                Private payout complete
+              </p>
               <p className="text-[11px] text-green-600 mt-0.5">
                 Routed via Convergence · shielded address credited
               </p>
@@ -235,10 +257,13 @@ export function EarlyExitButton({
             balanceState === 'fetching') && (
             <div className="flex items-center gap-2 text-[11px] text-green-700">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              {balanceState === 'switching-sepolia' ? 'Switching to Sepolia…'
-               : balanceState === 'signing'          ? 'Sign in wallet…'
-               : balanceState === 'switching-back'   ? 'Switching back…'
-               : 'Fetching balance…'}
+              {balanceState === 'switching-sepolia'
+                ? 'Switching to Sepolia…'
+                : balanceState === 'signing'
+                  ? 'Sign in wallet…'
+                  : balanceState === 'switching-back'
+                    ? 'Switching back…'
+                    : 'Fetching balance…'}
             </div>
           )}
 
@@ -248,7 +273,10 @@ export function EarlyExitButton({
                 Shielded balance (Convergence vault)
               </p>
               {balances.map((b, i) => (
-                <p key={i} className="text-sm font-mono font-semibold text-green-900">
+                <p
+                  key={i}
+                  className="text-sm font-mono font-semibold text-green-900"
+                >
                   {b.formatted}
                 </p>
               ))}
@@ -270,7 +298,7 @@ export function EarlyExitButton({
             className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-700 transition-colors"
           >
             <RotateCcw className="w-3 h-3" />
-            Reset demo
+            Back
           </button>
         </div>
       )}

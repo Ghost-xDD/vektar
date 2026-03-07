@@ -2,7 +2,7 @@
   "polygon": {
     "chainSelectorName": "polygon-mainnet",
     "isTestnet": false,
-    "escrowAddress": "0x72D11a8ccd35366ee4021a1D55a7930ab1f00f27",
+    "escrowAddress": "0x4e4a57aae1c5bbb81a428376a997cb6011844166",
     "umaOracleAddress": "0xBb1A8db2D4350976a11cdfA60A1d43f97710Da49",
     "umaCtfAdapterAddress": "0x6A9D222616C90FcA5754cd1333cFD9b7fb6a4F74",
     "gasLimit": "500000"
@@ -10,7 +10,7 @@
   "base": {
     "chainSelectorName": "ethereum-mainnet-base-1",
     "isTestnet": false,
-    "vaultAddress": "0x287c88c8c9245daa6a220fef38054fcd174e65c8",
+    "vaultAddress": "0xd09076696fb2a097c315c4de816bdafc3a893edc",
     "gasLimit": "1000000"
   },
   "polymarket": {

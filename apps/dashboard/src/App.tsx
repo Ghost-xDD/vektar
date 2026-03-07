@@ -283,6 +283,7 @@ export default function App() {
               newShieldedAddress={shieldedAddr.shieldedAddress}
               lockedShares={position?.lockedShares ?? 0}
               hasPosition={position?.hasPosition ?? false}
+              privatePayoutComplete={earlyExit.state === 'private_complete'}
               isLoading={positionLoading}
               isConnected={!!wallet.address}
               isCorrectChain={wallet.isCorrectChain}
