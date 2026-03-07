@@ -71,6 +71,29 @@ function ChainPair() {
   );
 }
 
+function TxHashLink({
+  label,
+  hash,
+  href
+}: {
+  label: string;
+  hash: `0x${string}`;
+  href: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="shrink-0 flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors font-mono"
+    >
+      <span className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500">{label}</span>
+      {hash.slice(0, 6)}...
+      <ExternalLink className="w-2.5 h-2.5" />
+    </a>
+  );
+}
+
 export function ActivityFeed({ events }: ActivityFeedProps) {
   if (events.length === 0) {
     return (
@@ -135,19 +158,28 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
             </div>
           </div>
 
-          <a
-            href={
-              event.type === 'final_settlement'
-                ? `https://dashboard.tenderly.co/explorer/vnet/${BASE_VNET}/tx/${event.txHash}`
-                : event.tenderlyUrl
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors font-mono mt-0.5"
-          >
-            {event.txHash.slice(0, 6)}...
-            <ExternalLink className="w-2.5 h-2.5" />
-          </a>
+          {event.type === 'final_settlement' ? (
+            <div className="shrink-0 mt-0.5 flex flex-col items-end gap-1">
+              <TxHashLink
+                label="Base"
+                hash={event.txHash}
+                href={`https://dashboard.tenderly.co/explorer/vnet/${BASE_VNET}/tx/${event.txHash}`}
+              />
+              {event.polygonTxHash && event.polygonTenderlyUrl && (
+                <TxHashLink
+                  label="Polygon"
+                  hash={event.polygonTxHash}
+                  href={event.polygonTenderlyUrl}
+                />
+              )}
+            </div>
+          ) : (
+            <TxHashLink
+              label="Tx"
+              hash={event.txHash}
+              href={event.tenderlyUrl}
+            />
+          )}
         </div>
       ))}
     </div>

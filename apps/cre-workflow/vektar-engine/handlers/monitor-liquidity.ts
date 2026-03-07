@@ -24,6 +24,9 @@ import { fetchMergedOrderBook } from "../integrations/polymarket";
  */
 export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string> => {
   try {
+    const demoFallbackShares = runtime.config.demo?.collateralFallbackShares ?? 20_000;
+    const demoFallbackCollateralWei = BigInt(demoFallbackShares) * 10n ** 18n;
+
     runtime.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     runtime.log("[TRIGGER] Cron fired: */12 * * * * *");
     runtime.log("[ORACLE]  Settlement oracle cycle started");
@@ -39,6 +42,7 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
     runtime.log(`[ORACLE] Processing ${markets.length} market(s)`);
 
     for (const market of markets) {
+      const scenario = runtime.config.demo?.scenario ?? "normal";
       const shortToken = market.tokenId.substring(0, 20) + "...";
       runtime.log(`[ORACLE] Market: ${shortToken}`);
       runtime.log(`[HTTP]   Fetching Polymarket order book (via Confidential HTTP — token_id hidden)...`);
@@ -60,8 +64,10 @@ export const monitorLiquidity = async (runtime: Runtime<Config>): Promise<string
       runtime.log(`[EVM READ] Polygon → getTotalLocked() for market...`);
       let totalLocked = getTotalLockedCollateral(runtime, market.tokenId);
       if (totalLocked <= 0n) {
-        runtime.log(`[ORACLE] No locked collateral for ${shortToken}, using 1e18 for demo`);
-        totalLocked = 1000000000000000000n;
+        runtime.log(
+          `[ORACLE] No locked collateral for ${shortToken}; using demo fallback of ${demoFallbackShares.toLocaleString()} shares in ${scenario} mode`
+        );
+        totalLocked = demoFallbackCollateralWei;
       }
 
       // Reuse the LTV engine — the VWAP output is the same signal we need.

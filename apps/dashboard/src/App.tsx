@@ -59,7 +59,12 @@ export default function App() {
         : volume > 0
           ? `$${volume.toLocaleString()}`
           : '—';
-  const isFinallySettled = events.some((e) => e.type === 'final_settlement');
+  const normalizedWallet = wallet.address?.toLowerCase();
+  const isFinallySettled =
+    !!normalizedWallet &&
+    events.some(
+      (e) => e.type === 'final_settlement' && e.user?.toLowerCase() === normalizedWallet
+    );
 
   return (
     <div className="min-h-screen w-full relative bg-white">
@@ -196,7 +201,7 @@ export default function App() {
                 <span>
                   User:{' '}
                   <span className="font-mono text-zinc-700 font-medium">
-                    {(wallet.address ?? import.meta.env.VITE_USER_ADDRESS ?? '0x0')?.slice(0, 8)}...
+                    {(wallet.address ?? '0x0')?.slice(0, 8)}...
                   </span>
                 </span>
               </div>
@@ -305,6 +310,7 @@ export default function App() {
               isOracleActive={settlement?.isActive ?? false}
               isOracleStale={settlement?.isStale ?? false}
               isSettled={position?.settled ?? false}
+              hasShares={(position?.shares ?? 0) > 0}
               isConnected={!!wallet.address}
               isCorrectChain={wallet.isCorrectChain}
               onExecute={earlyExit.execute}

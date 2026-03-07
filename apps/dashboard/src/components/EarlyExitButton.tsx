@@ -21,6 +21,7 @@ interface EarlyExitButtonProps {
   isOracleActive: boolean;
   isOracleStale: boolean;
   isSettled: boolean;
+  hasShares: boolean;
   isConnected: boolean;
   isCorrectChain: boolean;
   onExecute: () => void;
@@ -42,6 +43,7 @@ export function EarlyExitButton({
   isOracleActive,
   isOracleStale,
   isSettled,
+  hasShares,
   isConnected,
   isCorrectChain,
   onExecute,
@@ -57,6 +59,7 @@ export function EarlyExitButton({
     isCorrectChain &&
     isOracleActive &&
     !isOracleStale &&
+    hasShares &&
     !isSettled &&
     state === 'idle';
 
@@ -108,6 +111,8 @@ export function EarlyExitButton({
               <p className="text-[11px] text-amber-600">⚠ Oracle stale — wait for next CRE cycle</p>
             ) : !isOracleActive ? (
               <p className="text-[11px] text-zinc-400">Waiting for first oracle update...</p>
+            ) : !hasShares ? (
+              <p className="text-[11px] text-zinc-400">No registered shares to exit yet</p>
             ) : (
               <p className="text-[11px] text-zinc-400">
                 Signs earlyExit(tokenId) on Base · USDC paid from pool immediately

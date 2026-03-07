@@ -167,8 +167,10 @@ export function useOrderBook() {
         throw error;
       }
     },
-    refetchInterval: 12000, // Poll every 12 seconds (matches CRE cycle)
-    staleTime: 10000,
+    refetchInterval: 30000,
+    staleTime: 30000,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message.includes('404')) {
         return false;

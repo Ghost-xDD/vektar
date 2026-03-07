@@ -1,18 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { baseClient, polygonClient } from '../lib/clients';
 import { vaultAbi, escrowAbi } from '../lib/abis';
+import { isLightRpcMode } from '../lib/rpc-mode';
 
 const VAULT_ADDRESS   = import.meta.env.VITE_SETTLEMENT_VAULT_ADDRESS as `0x${string}`;
 const ESCROW_ADDRESS  = import.meta.env.VITE_ESCROW_ADDRESS as `0x${string}`;
 const TOKEN_ID        = BigInt(import.meta.env.VITE_TOKEN_ID);
-const DEMO_ADDRESS    = import.meta.env.VITE_USER_ADDRESS as `0x${string}`;
 
 export function usePosition(connectedAddress?: `0x${string}` | null) {
-  const userAddress = connectedAddress ?? DEMO_ADDRESS;
+  const userAddress = connectedAddress ?? null;
 
   return useQuery({
-    queryKey: ['position', userAddress, TOKEN_ID.toString()],
+    queryKey: ['position', userAddress ?? 'disconnected', TOKEN_ID.toString()],
+    enabled: !!userAddress,
     queryFn: async () => {
+      if (!userAddress) return null;
+
       const pos = await baseClient.readContract({
         address: VAULT_ADDRESS,
         abi: vaultAbi,
@@ -38,8 +41,10 @@ export function usePosition(connectedAddress?: `0x${string}` | null) {
         hasPosition:     Number(lockedShares) > 0 || Number(pos[1]) > 0
       };
     },
-    refetchInterval: 12000,
-    staleTime: 10000,
+    refetchInterval: isLightRpcMode ? false : 60000,
+    staleTime: 60000,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     retry: 2
   });
 }
