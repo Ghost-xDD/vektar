@@ -104,35 +104,13 @@ Result: payout amount credited to the user's shielded address on Ethereum Sepoli
 
 ## Privacy Architecture
 
-```
-VEKTAR PRIVACY STACK
+| Layer | What's hidden | How |
+|-------|--------------|-----|
+| **Input** — Confidential HTTP | `token_id`, full CLOB response | `ConfidentialHTTPClient` routes through TEE enclave. No DON node ever sees which market Vektar is pricing. |
+| **Keys** — CRE Secrets | `VAULT_OPERATOR_KEY` — never in code, logs, or any on-chain tx | `runtime.getSecret("vaultOperatorKey")` reads from Vault DON. Key signs EIP-712 message; the signature goes in the request body. The key itself is never transmitted. |
+| **Output** — Convergence + ACE | Payout amount, recipient wallet, operator identity | Handler 3 calls `POST /private-transfer`. Funds move to user's shielded address. `hide-sender` flag conceals operator from recipient too. Chainlink ACE enforces KYC/AML on every vault operation. |
 
-Layer 1 — Input privacy (Confidential HTTP)
-  Signal:   Polymarket CLOB order book
-  What's hidden: token_id in the request URL, full order book response
-  How: ConfidentialHTTPClient routes through a TEE enclave.
-       No DON node ever sees which market Vektar is pricing.
-  Track: CRE Confidential HTTP capability ✓
-
-Layer 2 — Key management (CRE Secrets)
-  Signal:   Vault operator authorization
-  What's hidden: VAULT_OPERATOR_KEY — never in code, logs, or any on-chain tx
-  How: runtime.getSecret("vaultOperatorKey") reads from the CRE Vault DON.
-       The key signs an EIP-712 message; the signature goes in the request body.
-       The key itself is never transmitted.
-  Track: "without exposing secrets" ✓
-
-Layer 3 — Output privacy (Convergence 2026 + Chainlink ACE)
-  Signal:   Settlement payout
-  What's hidden: payout amount, recipient wallet, operator identity
-  How: Handler 3 calls POST /private-transfer on the Convergence vault API.
-       Funds move to the user's shielded address.
-       hide-sender flag conceals operator identity from the recipient too.
-       Chainlink ACE enforces KYC/AML on every vault deposit and withdrawal.
-  Track: "compliant non-public token movement" ✓
-```
-
-Every vector is covered. Before Vektar: watching any DON node log reveals which market is being priced, who called `earlyExit()`, how much they received, and where it went. After Vektar: nothing.
+Before Vektar: watching any DON node log reveals which market is being priced, who called `earlyExit()`, how much they received, and where it went. After Vektar: none of it.
 
 ### Compliance demo
 
@@ -147,7 +125,7 @@ cast call 0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13 \
 # Unknown address → reverts: operation_denied_by_policy
 ```
 
-### Why the payout goes through CRE instead of a direct cross-chain call
+### Why CRE bridges the payout
 
 `SettlementVault` lives on a Tenderly Base mainnet fork. The Convergence private vault lives on Ethereum Sepolia. They cannot call each other. Handler 3 is CRE acting as the privacy bridge — it watches the Base event and calls the Sepolia vault API using operator credentials stored as CRE secrets. No bridge, no wrapped tokens, no on-chain cross-chain call.
 
@@ -227,11 +205,9 @@ CRE reads `getLockedBalance()` — not `balanceOf`. The position is verifiably f
 
 ## Why This Requires CRE
 
-This oracle cannot be built on any other platform. It requires six capabilities simultaneously:
+This oracle cannot be built on any other platform. It requires five capabilities simultaneously:
 
-**Consensus on offchain APIs.** Every DON node independently fetches the Polymarket CLOB via Confidential HTTP. BFT consensus across nodes ensures no single node can manipulate the settlement value. The order book data is as trustworthy as any on-chain read.
-
-**Confidential HTTP.** The Polymarket CLOB request routes through a TEE enclave — `token_id` and the full response are hidden from node logs. API credentials can be injected via Vault DON secrets without appearing in workflow config. No other oracle platform offers this.
+**BFT consensus on offchain data with input privacy.** Every DON node independently fetches the Polymarket CLOB via `ConfidentialHTTPClient` — the request routes through a TEE enclave so `token_id` and the full response are never in any node log. BFT consensus across all nodes then agrees on the result. The order book data is as trustworthy as any on-chain read, and which market is being priced stays private. No other oracle platform offers both simultaneously.
 
 **Cross-chain reads.** Collateral is on Polygon. CRE reads the locked escrow balance without bridging — native cross-chain state verification.
 
