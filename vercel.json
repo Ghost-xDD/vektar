@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd apps/dashboard && npm run build",
+  "outputDirectory": "apps/dashboard/dist",
+  "installCommand": "npm install",
+  "framework": null,
+  "ignoreCommand": "exit 0"
+}
