@@ -1,14 +1,20 @@
+<div align="center">
+
 # Vektar
 
-[![Chainlink CRE](https://img.shields.io/badge/Chainlink-CRE-375BD2?logo=chainlink&logoColor=white)](https://docs.chain.link/cre)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Bun](https://img.shields.io/badge/Bun-1.2+-FBF0DF?logo=bun&logoColor=black)](https://bun.sh)
-[![Solidity](https://img.shields.io/badge/Solidity-0.8-363636?logo=solidity&logoColor=white)](https://soliditylang.org/)
-[![Polygon](https://img.shields.io/badge/Polygon-mainnet_fork-7B3FE4?logo=polygon&logoColor=white)](https://polygon.technology/)
-[![Base](https://img.shields.io/badge/Base-mainnet_fork-0052FF?logo=coinbase&logoColor=white)](https://base.org/)
-[![Hackathon](https://img.shields.io/badge/Chainlink-Convergence_2026-375BD2)](https://chain.link/)
-
 **The settlement oracle for prediction markets.**
+
+[![Chainlink CRE](https://img.shields.io/badge/Chainlink-CRE-375BD2?logo=chainlink&logoColor=white)](https://docs.chain.link/cre)
+[![Convergence 2026](https://img.shields.io/badge/Chainlink-Convergence_2026-375BD2)](https://chain.link/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8-363636?logo=solidity&logoColor=white)](https://soliditylang.org/)
+[![Bun](https://img.shields.io/badge/Bun-1.2+-FBF0DF?logo=bun&logoColor=black)](https://bun.sh)
+[![Polygon](https://img.shields.io/badge/Polygon-VNet-7B3FE4?logo=polygon&logoColor=white)](https://polygon.technology/)
+[![Base](https://img.shields.io/badge/Base-VNet-0052FF?logo=coinbase&logoColor=white)](https://base.org/)
+
+</div>
+
+---
 
 ```
 getPrice("ETH/USD")         → $3,241   ✓  (Chainlink)
