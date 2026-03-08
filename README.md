@@ -337,10 +337,25 @@ The 1 LINK in the demo is a placeholder representing the USDC value the user is 
 ```bash
 bun install
 cd apps/cre-workflow && cp env.template .env
-# Edit .env: Tenderly RPCs, CRE_ETH_PRIVATE_KEY, VAULT_OPERATOR_KEY (see setup-private-vault.sh)
+# Edit .env: Tenderly RPCs, CRE_ETH_PRIVATE_KEY
 ```
 
-Ensure `apps/dashboard/.env.local` has `VITE_BASE_TENDERLY_RPC`, `VITE_SETTLEMENT_VAULT_ADDRESS`, `VITE_ESCROW_ADDRESS`, etc. (see `apps/dashboard/.env.local.backup`).
+**Handler 3 (private payout)** — run once before testing early exit. Requires `PRIVATE_KEY` in `.env` with Sepolia ETH + LINK:
+
+```bash
+cd apps/cre-workflow
+./setup-private-vault.sh
+# Generates vault operator, funds it, deposits 1 LINK into Convergence vault, writes VAULT_OPERATOR_KEY to .env
+```
+
+**Dashboard** — copy env template and fill in (Tenderly RPCs, contract addresses, operator key to match cre-workflow):
+
+```bash
+cd apps/dashboard && cp env.template .env.local
+# Edit .env.local — VITE_OPERATOR_KEY must match VAULT_OPERATOR_KEY in cre-workflow/.env
+```
+
+**Deploy your own contracts** (optional) — if not using pre-deployed addresses, run `packages/contracts/deploy-demo.sh` (testnets) or deploy to Tenderly forks with `forge script`, then `packages/contracts/update-config.sh` to sync config.json and .env files.
 
 ### Run the demo
 
@@ -395,6 +410,19 @@ cd apps/dashboard && bun dev  # localhost:5173
 ---
 
 ## Repo
+
+**Key scripts**
+
+| Script | Purpose |
+|--------|---------|
+| `apps/cre-workflow/setup-private-vault.sh` | One-time setup for Handler 3 — generates vault operator, funds with Sepolia ETH + LINK, deposits into Convergence vault |
+| `apps/cre-workflow/run-normal.sh` | Handler 1 — one oracle cycle (normal liquidity) |
+| `apps/cre-workflow/run-thin.sh` | Handler 1 — thin liquidity scenario |
+| `apps/cre-workflow/run-crisis.sh` | Handler 1 — crisis liquidity scenario |
+| `apps/cre-workflow/test-handler3.sh` | End-to-end Handler 3 test (registers position, early exit, private payout) |
+| `packages/contracts/deploy-demo.sh` | Deploy CollateralEscrow + SettlementVault to testnets |
+| `packages/contracts/update-config.sh` | Sync deployed addresses to config.json, cre-workflow/.env, dashboard/.env.local |
+| `apps/cre-workflow/vektar-engine/scripts/find-uma-events.ts` | Find real `QuestionResolved` tx hashes for Handler 2 |
 
 ```
 apps/
