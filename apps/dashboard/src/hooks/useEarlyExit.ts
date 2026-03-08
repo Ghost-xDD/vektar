@@ -73,5 +73,5 @@ export function useEarlyExit() {
     setError(null);
   };
 
-  return { execute, state, txHash, paidOutUSDC, error, markPrivateComplete, reset };
+  return { execute, state, txHash, paidOutUSDC, error, transactionId, markPrivateComplete, reset };
 }
