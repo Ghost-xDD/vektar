@@ -164,7 +164,7 @@ A settlement oracle for prediction markets can't be tested on a blank testnet â€
 ### Virtual TestNets
 | Chain | Virtual TestNet RPC | Explorer |
 |---|---|---|
-| Polygon | `https://virtual.polygon.eu.rpc.tenderly.co/4ad68571-...` | [Transactions](https://dashboard.tenderly.co/explorer/vnet/4ad68571-6a73-406b-ad62-a169a4593612) |
+| Polygon | `https://virtual.polygon.eu.rpc.tenderly.co/4ad68571-...` | [Explorer](https://dashboard.tenderly.co/explorer/vnet/4ad68571-6a73-406b-ad62-a169a4593612) |
 | Base | `https://virtual.base.eu.rpc.tenderly.co/2e625465-...` | [Explorer](https://dashboard.tenderly.co/explorer/vnet/2e625465-6c0e-4577-b01f-790eb8000996) |
 
 Both configured in [`project.yaml`](apps/cre-workflow/vektar-engine/project.yaml) â€” the CRE simulator reads these directly.
