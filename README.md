@@ -61,7 +61,7 @@ This is the **liquidity illusion**: prediction market price has no relationship 
 
 **No early exit.** Users can't leave before binary resolution. A "Yes" share priced at $0.80 drops to $0.00 the instant an event resolves wrong — no gradual path out. $20B+ is frozen waiting for yes/no outcomes, sometimes months away.
 
-**No derivative layer.** Options, structured products, and leveraged positions all require a continuous, bounded, verifiable settlement signal. Binary resolution (0 or $1) can't be an underlying.
+**No derivative layer.** Options, structured products, and leveraged positions all require a continuous, bounded, verifiable settlement signal. Binary resolution (0 or 1) can't be an underlying.
 
 **No privacy.** Every prediction market action is fully visible on-chain — what you hold, when you exit, how much you receive. Large positions can't exit without signaling intent to the entire market. Settlement infrastructure that leaks trader activity is settlement infrastructure nobody will use at scale.
 
