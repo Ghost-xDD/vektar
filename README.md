@@ -35,7 +35,7 @@ The oracle is the product. Early exit is one thing you can build with it.
 - [Privacy](#privacy)
 - [Why CRE](#why-cre)
 - [What This Enables](#what-this-enables)
-- [Files Using Chainlink CRE](#files-using-chainlink-cre)
+- [Chainlink CRE Usage](#chainlink-cre-usage)
 - [Comparison](#comparison)
 - [Challenges](#challenges)
 - [Quick Start](#quick-start)
@@ -255,7 +255,7 @@ Early exit is the simplest thing you can build on this oracle. It's not the most
 
 ---
 
-## Files Using Chainlink CRE
+## Chainlink CRE Usage
 
 Every file that integrates a Chainlink service, in execution order.
 
