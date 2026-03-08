@@ -31,6 +31,7 @@ The oracle is the product. Early exit is one thing you can build with it.
 - [The Problem](#the-problem)
 - [How It Works](#how-it-works)
 - [Architecture](#architecture)
+- [Why Tenderly Virtual TestNets](#why-tenderly-virtual-testnets)
 - [Privacy](#privacy)
 - [Why CRE](#why-cre)
 - [What This Enables](#what-this-enables)
@@ -117,8 +118,6 @@ UMA CTF Adapter   ──log──▶ Handler 2          ──write──▶ set
 | `DemoCompliantPrivateTokenVault` | Ethereum Sepolia | `0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13` |
 | CRE Forwarder (mock) | Base fork | `0x5e342a8438b4f5d39e72875fcee6f76b39cce548` |
 
-> Tenderly mainnet forks are used so Handler 2 can be triggered with a real historical UMA tx — Polymarket's CTF token state, USDC, and `QuestionResolved` events all exist on mainnet. No mock oracles, no mock events.
-
 ### Key Interfaces
 
 ```solidity
@@ -153,6 +152,47 @@ Spoofing requires placing fake bids on Polymarket. Three layers make it unprofit
 | **TWOB** | Oracle uses minimum liquidity over the last 5 cycles (60s) | Fake bids must persist for a full minute |
 | **Rate limit** | Settlement value can increase ≤ 2% per cycle on-chain | Ramping from zero takes 37+ cycles (~7.5 min) |
 | **Safety margin** | Oracle reports 90% of calculated exit liquidity | Built-in 10% haircut on every exploit attempt |
+
+---
+
+## Why Tenderly Virtual TestNets
+
+A settlement oracle for prediction markets can't be tested on a blank testnet — it needs real Polymarket CTF token balances, real USDC liquidity, and real UMA resolution events. [Tenderly Virtual TestNets](https://tenderly.co/) provide exactly this: mainnet state synchronization with zero setup, so the CRE workflow operates against the same state it would in production.
+
+### Virtual TestNets
+
+| Chain | Virtual TestNet RPC |
+|---|---|
+| Polygon | `https://virtual.polygon.eu.rpc.tenderly.co/4ad68571-...` |
+| Base | `https://virtual.base.eu.rpc.tenderly.co/2e625465-...` |
+
+Both configured in [`project.yaml`](apps/cre-workflow/vektar-engine/project.yaml) — the CRE simulator reads these directly.
+
+### What Real Mainnet State Unlocks
+
+**Handler 2 — real UMA resolution.** The `QuestionResolved` event that triggers final settlement comes from a real Polygon mainnet tx (`0x8ee8b5d...`, block 83622941). No synthetic events, no mock oracles — the CRE EVM log trigger fires on an actual historical market resolution.
+
+**Handler 1 — real collateral reads.** The settlement oracle reads locked collateral from the Polygon Virtual TestNet. Because it's synced with mainnet state, `getLockedBalance()` returns values backed by real CTF token balances — the same values the oracle would read in production.
+
+**Contract deployment — production-identical.** Contracts deploy to Virtual TestNets with the same gas model, precompiles, and token state as mainnet. The path from this demo to production is a config change (swap RPC URLs), not a rewrite.
+
+### Tenderly-Specific Features Used
+
+| Feature | How we use it |
+|---|---|
+| **Mainnet state sync** | Real Polymarket CTF tokens, USDC balances, and UMA events available without deploying to mainnet |
+| **`tenderly_setErc20Balance`** | Admin RPC to seed USDC into `SettlementVault` for early exit payouts during demo |
+| **Transaction tracing** | Full call traces for every CRE `onReport()` write — used to verify BFT-signed reports are accepted |
+| **Unlimited faucet** | No gas constraints during CRE simulation — test all three handlers without funding wallets |
+| **Zero-setup environment** | No local node, no genesis config — `project.yaml` points at Tenderly RPCs and the CRE simulator runs |
+
+### CRE + Virtual TestNets Synergy
+
+CRE workflows are inherently multi-chain — they read from one chain and write to another. Testing this without Virtual TestNets means either deploying to multiple live testnets (unreliable, no real state) or running local forks (no persistence, no explorer, no debugging). Virtual TestNets give us:
+
+1. **Two persistent chains with real state** — Polygon and Base Virtual TestNets run simultaneously, each synced with mainnet
+2. **CRE simulator connects directly** — `project.yaml` overrides point CRE at both Virtual TestNets; the simulator treats them as real chains
+3. **Full observability** — every cross-chain write (settlement updates on Base, collateral releases on Polygon) is visible in the Tenderly dashboard with call traces and state diffs
 
 ---
 
