@@ -4,6 +4,8 @@
 
 **The settlement oracle for prediction markets.**
 
+[**Live Demo →**](https://vektar.vercel.app/)
+
 [![Chainlink CRE](https://img.shields.io/badge/Chainlink-CRE-375BD2?logo=chainlink&logoColor=white)](https://docs.chain.link/cre)
 [![Convergence 2026](https://img.shields.io/badge/Chainlink-Convergence_2026-375BD2)](https://chain.link/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
