@@ -15,9 +15,10 @@ contract SettlementVault {
 
     address public immutable CRE_FORWARDER;
     address public immutable USDC;
+    address public owner;
 
-    /// @notice Max settlement value can increase per 12s CRE cycle (200 = 2%, anti-spoofing)
-    uint256 public constant MAX_VALUE_INCREASE_PER_UPDATE = 200;
+    /// @notice Max settlement value can increase per 12s CRE cycle, in bps (200 = 2%, 10000 = no cap)
+    uint256 public maxValueIncreasePerUpdateBps;
     /// @notice Oracle is stale after this many missed cycles (5 cycles × 12s = 60s)
     uint256 public constant ORACLE_STALENESS_THRESHOLD = 60;
 
@@ -56,23 +57,42 @@ contract SettlementVault {
     event EarlyExitExecuted(address indexed user, uint256 indexed tokenId, uint256 payout);
     event PositionDeposited(address indexed user, uint256 indexed tokenId, uint256 shares);
     event FinalSettlement(address indexed user, uint256 indexed tokenId, uint8 outcome, uint256 poolPayout);
+    event OracleCapUpdated(uint256 oldBps, uint256 newBps);
 
     // Errors
     error OnlyCREForwarder();
+    error OnlyOwner();
+    error InvalidOracleCap();
     error OracleNotReady();
     error OracleStale();
     error AlreadySettled();
     error NoPosition();
     error InsufficientPoolBalance();
 
-    constructor(address _creForwarder, address _usdc) {
+    constructor(address _creForwarder, address _usdc, uint256 _maxValueIncreasePerUpdateBps) {
+        if (_maxValueIncreasePerUpdateBps > 10000) revert InvalidOracleCap();
         CRE_FORWARDER = _creForwarder;
         USDC = _usdc;
+        owner = msg.sender;
+        maxValueIncreasePerUpdateBps = _maxValueIncreasePerUpdateBps;
     }
 
     modifier onlyCREForwarder() {
         if (msg.sender != CRE_FORWARDER) revert OnlyCREForwarder();
         _;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert OnlyOwner();
+        _;
+    }
+
+    /// @notice Updates the upward oracle move cap. Demo mode can set 10000 (100%) for instant rebounds.
+    function setMaxValueIncreasePerUpdateBps(uint256 newBps) external onlyOwner {
+        if (newBps > 10000) revert InvalidOracleCap();
+        uint256 oldBps = maxValueIncreasePerUpdateBps;
+        maxValueIncreasePerUpdateBps = newBps;
+        emit OracleCapUpdated(oldBps, newBps);
     }
 
     /// @notice CRE Forwarder entry point — routes signed reports by function selector
@@ -98,7 +118,7 @@ contract SettlementVault {
         uint256 current = oracle.settlementValueUSDC;
 
         if (newValue > current && current > 0) {
-            uint256 maxAllowed = current + (current * MAX_VALUE_INCREASE_PER_UPDATE / 10000);
+            uint256 maxAllowed = current + (current * maxValueIncreasePerUpdateBps / 10000);
             if (newValue > maxAllowed) newValue = maxAllowed;
         }
 

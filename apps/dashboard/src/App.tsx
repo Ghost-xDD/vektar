@@ -2,11 +2,16 @@ import { Zap, ExternalLink, BarChart2, Activity, Droplets } from 'lucide-react';
 import { LOGOS } from './lib/logos';
 import { Link } from 'react-router-dom';
 
-const BASE_EXPLORER = 'https://dashboard.tenderly.co/explorer/vnet/2e625465-6c0e-4577-b01f-790eb8000996';
-const POLYGON_EXPLORER = 'https://dashboard.tenderly.co/explorer/vnet/4ad68571-6a73-406b-ad62-a169a4593612';
+const BASE_EXPLORER =
+  'https://dashboard.tenderly.co/explorer/vnet/2e625465-6c0e-4577-b01f-790eb8000996';
+const POLYGON_EXPLORER =
+  'https://dashboard.tenderly.co/explorer/vnet/4ad68571-6a73-406b-ad62-a169a4593612';
+const POLYMARKET_MARKET_TITLE = 'What price will Bitcoin hit in 2026?';
+const POLYMARKET_TARGET_OUTCOME = '↑ 100,000';
 import { useSettlementValue } from './hooks/useSettlementValue';
 import { usePosition } from './hooks/usePosition';
 import { useOrderBook, type OrderBookLevel } from './hooks/useOrderBook';
+import { useMarketVolume } from './hooks/useMarketVolume';
 import { useActivityEvents } from './hooks/useActivityEvents';
 import { useEarlyExit } from './hooks/useEarlyExit';
 import { useShieldedAddress } from './hooks/useShieldedAddress';
@@ -29,9 +34,17 @@ export default function App() {
   useEventWatcher();
 
   const wallet = useWallet();
-  const { data: settlement, isLoading: settlementLoading } = useSettlementValue();
-  const { data: position, isLoading: positionLoading } = usePosition(wallet.address);
-  const { data: orderBook } = useOrderBook() as { data: { bids: OrderBookLevel[]; totalBidDepth: number; timestamp: number } | undefined };
+  const { data: settlement, isLoading: settlementLoading } =
+    useSettlementValue();
+  const { data: position, isLoading: positionLoading } = usePosition(
+    wallet.address,
+  );
+  const { data: marketVolume } = useMarketVolume();
+  const { data: orderBook } = useOrderBook() as {
+    data:
+      | { bids: OrderBookLevel[]; totalBidDepth: number; timestamp: number }
+      | undefined;
+  };
   const { data: events = [] } = useActivityEvents();
   const earlyExit = useEarlyExit();
   const shieldedAddr = useShieldedAddress();
@@ -39,7 +52,26 @@ export default function App() {
   const convergenceBalance = useConvergenceBalance();
 
   const spotPrice = orderBook?.bids?.[0]?.price ?? 0;
-  const isFinallySettled = events.some(e => e.type === 'final_settlement');
+  const volume = marketVolume ?? 0;
+  const volumeLabel =
+    volume >= 1e6
+      ? `$${(volume / 1e6).toFixed(1)}M`
+      : volume >= 1e3
+        ? `$${(volume / 1e3).toFixed(0)}k`
+        : volume > 0
+          ? `$${volume.toLocaleString()}`
+          : '—';
+  const normalizedWallet = wallet.address?.toLowerCase();
+  const hasShares = (position?.shares ?? 0) > 0;
+  const registeredShieldedAddress =
+    position?.shieldedAddress && position.shieldedAddress !== ZERO_ADDR
+      ? position.shieldedAddress
+      : null;
+  const isFinallySettled =
+    !!normalizedWallet &&
+    events.some(
+      (e) => e.type === 'final_settlement' && e.user?.toLowerCase() === normalizedWallet
+    );
 
   return (
     <div className="min-h-screen w-full relative bg-white">
@@ -54,12 +86,11 @@ export default function App() {
             transparent 70%
           )`,
           filter: 'blur(80px)',
-          backgroundRepeat: 'no-repeat'
+          backgroundRepeat: 'no-repeat',
         }}
       />
 
-      {/* Sticky header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-zinc-200/80">
+      <header className="sticky top-0 z-40 shadow-sm backdrop-blur-xl border-b border-zinc-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             {/* Logo */}
@@ -136,19 +167,35 @@ export default function App() {
 
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Market header */}
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 backdrop-blur-sm p-5 shadow-sm">
+        <div className="rounded-2xl border-2 border-orange-200 bg-white/90 backdrop-blur-sm p-6 shadow-md">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">
-                  <img src={LOGOS.polymarket} alt="" className="w-3 h-3 rounded object-contain" />
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-orange-700 bg-orange-100 px-2.5 py-1 rounded-full border border-orange-200">
+                  <img
+                    src={LOGOS.polymarket}
+                    alt=""
+                    className="w-3 h-3 rounded object-contain"
+                  />
                   Polymarket
                 </span>
-                <span className="text-[10px] text-zinc-400">$673k volume</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-zinc-900 text-white">
+                  Official Market
+                </span>
+                <span className="text-[10px] text-zinc-400">
+                  {volumeLabel} Vol.
+                </span>
               </div>
-              <h2 className="text-lg font-semibold text-zinc-900 leading-snug">
-                Will Bitcoin reach $100,000 by Dec 31, 2026?
+              <h2 className="text-2xl sm:text-[1.7rem] font-extrabold text-zinc-950 leading-tight tracking-tight">
+                {POLYMARKET_MARKET_TITLE}
               </h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Tracking outcome{' '}
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-900 text-white font-bold">
+                  {POLYMARKET_TARGET_OUTCOME}
+                </span>{' '}
+                for this market.
+              </p>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-400">
                 <span>
                   Spot:{' '}
@@ -158,14 +205,20 @@ export default function App() {
                 </span>
                 <span>
                   Shares:{' '}
-                  <span className={`font-mono font-medium ${position?.settled ? 'text-zinc-400 line-through' : 'text-zinc-700'}`}>
-                    {position?.settled ? '0' : '20,000 YES'}
+                  <span
+                    className={`font-mono font-medium ${position?.settled ? 'text-zinc-400 line-through' : 'text-zinc-700'}`}
+                  >
+                    {positionLoading
+                      ? '...'
+                      : position?.settled
+                        ? '0'
+                        : `${(position?.shares ?? 0) > 0 ? position!.shares : position?.lockedShares ?? 0} YES`}
                   </span>
                 </span>
                 <span>
                   User:{' '}
                   <span className="font-mono text-zinc-700 font-medium">
-                    {import.meta.env.VITE_USER_ADDRESS?.slice(0, 8)}...
+                    {(wallet.address ?? '0x0')?.slice(0, 8)}...
                   </span>
                 </span>
               </div>
@@ -211,7 +264,11 @@ export default function App() {
               </div>
               {orderBook && (
                 <span className="text-[10px] text-zinc-400 font-mono">
-                  ${orderBook.totalBidDepth.toLocaleString(undefined, { maximumFractionDigits: 0 })} depth
+                  $
+                  {orderBook.totalBidDepth.toLocaleString(undefined, {
+                    maximumFractionDigits: 0,
+                  })}{' '}
+                  depth
                 </span>
               )}
             </div>
@@ -221,8 +278,9 @@ export default function App() {
             />
             {orderBook && (
               <p className="mt-3 text-[11px] text-zinc-400 leading-relaxed">
-                This is the real exit liquidity. VWAP against these bids is what CRE
-                uses to set settlement value. When the chart empties, the oracle collapses.
+                This is the real exit liquidity. VWAP against these bids is what
+                CRE uses to set settlement value. When the chart empties, the
+                oracle collapses.
               </p>
             )}
           </div>
@@ -242,6 +300,7 @@ export default function App() {
               newShieldedAddress={shieldedAddr.shieldedAddress}
               lockedShares={position?.lockedShares ?? 0}
               hasPosition={position?.hasPosition ?? false}
+              privatePayoutComplete={earlyExit.state === 'private_complete'}
               isLoading={positionLoading}
               isConnected={!!wallet.address}
               isCorrectChain={wallet.isCorrectChain}
@@ -251,7 +310,9 @@ export default function App() {
           {/* Early Exit */}
           <div className="rounded-2xl border border-zinc-200 bg-white/80 backdrop-blur-sm p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-sm font-semibold text-zinc-900">Early Exit</h3>
+              <h3 className="text-sm font-semibold text-zinc-900">
+                Early Exit
+              </h3>
               {settlement?.isActive && !settlement.isStale && (
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-100">
                   Oracle ready
@@ -267,11 +328,15 @@ export default function App() {
               isOracleActive={settlement?.isActive ?? false}
               isOracleStale={settlement?.isStale ?? false}
               isSettled={position?.settled ?? false}
+              hasShares={hasShares}
               isConnected={!!wallet.address}
               isCorrectChain={wallet.isCorrectChain}
               onExecute={earlyExit.execute}
               onMarkComplete={() => earlyExit.markPrivateComplete()}
-              onReset={() => { earlyExit.reset(); convergenceBalance.reset(); }}
+              onReset={() => {
+                earlyExit.reset();
+                convergenceBalance.reset();
+              }}
               balanceState={convergenceBalance.state}
               balances={convergenceBalance.balances}
               balanceError={convergenceBalance.error}
@@ -285,15 +350,18 @@ export default function App() {
               shieldedAddress={shieldedAddr.shieldedAddress}
               generateState={shieldedAddr.state}
               generateError={shieldedAddr.error}
-              registeredAddress={
-                position?.shieldedAddress !== ZERO_ADDR
-                  ? position?.shieldedAddress
-                  : null
-              }
+              registeredAddress={registeredShieldedAddress}
+              hasShares={hasShares}
               registerState={registerPosition.state}
               registerError={registerPosition.error}
               onGenerate={shieldedAddr.generate}
-              onRegister={() => registerPosition.register(shieldedAddr.shieldedAddress ?? undefined)}
+              onRegister={() =>
+                registerPosition.register(
+                  shieldedAddr.shieldedAddress ??
+                    registeredShieldedAddress ??
+                    undefined,
+                )
+              }
             />
           </div>
         </div>
@@ -303,7 +371,9 @@ export default function App() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-zinc-500" />
-              <h3 className="text-sm font-semibold text-zinc-900">Activity Feed</h3>
+              <h3 className="text-sm font-semibold text-zinc-900">
+                Activity Feed
+              </h3>
               <span className="text-[10px] text-zinc-400">
                 Oracle · Exit · Settlement
               </span>
@@ -331,20 +401,36 @@ export default function App() {
               className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-[#7b3fe4]/[0.04] border border-[#7b3fe4]/15 min-w-[160px] text-center hover:bg-[#7b3fe4]/[0.07] transition-colors group"
             >
               <div className="w-8 h-8 rounded-full bg-[#7b3fe4]/10 flex items-center justify-center overflow-hidden">
-                <img src={LOGOS.polygon} alt="" className="w-5 h-5 object-contain" />
+                <img
+                  src={LOGOS.polygon}
+                  alt=""
+                  className="w-5 h-5 object-contain"
+                />
               </div>
-              <span className="text-xs font-semibold text-[#7b3fe4]">Polygon</span>
-              <span className="text-[10px] text-zinc-500">CollateralEscrow</span>
-              <span className="text-[10px] text-zinc-400 font-mono">CTF ERC-1155 Shares</span>
+              <span className="text-xs font-semibold text-[#7b3fe4]">
+                Polygon
+              </span>
+              <span className="text-[10px] text-zinc-500">
+                CollateralEscrow
+              </span>
+              <span className="text-[10px] text-zinc-400 font-mono">
+                CTF ERC-1155 Shares
+              </span>
               <ExternalLink className="w-2.5 h-2.5 text-[#7b3fe4]/40 group-hover:text-[#7b3fe4]/70 transition-colors" />
             </a>
 
             {/* Arrow */}
             <div className="hidden sm:flex flex-col items-center gap-1 px-3">
-              <span className="text-[9px] text-zinc-400 uppercase tracking-wide">EVM Read</span>
+              <span className="text-[9px] text-zinc-400 uppercase tracking-wide">
+                EVM Read
+              </span>
               <div className="flex items-center gap-0.5">
                 <div className="w-12 h-px bg-gradient-to-r from-[#7b3fe4]/30 to-orange-300/60" />
-                <svg className="w-3 h-3 text-orange-300" viewBox="0 0 12 12" fill="currentColor">
+                <svg
+                  className="w-3 h-3 text-orange-300"
+                  viewBox="0 0 12 12"
+                  fill="currentColor"
+                >
                   <path d="M6 2l4 4-4 4V6H2V6h4V2z" />
                 </svg>
               </div>
@@ -355,17 +441,27 @@ export default function App() {
               <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-orange-500" />
               </div>
-              <span className="text-xs font-semibold text-orange-600">CRE Workflow</span>
+              <span className="text-xs font-semibold text-orange-600">
+                CRE Workflow
+              </span>
               <span className="text-[10px] text-zinc-500">BFT Consensus</span>
-              <span className="text-[10px] text-zinc-400 font-mono">Cron + Event Triggers</span>
+              <span className="text-[10px] text-zinc-400 font-mono">
+                Cron + Event Triggers
+              </span>
             </div>
 
             {/* Arrow */}
             <div className="hidden sm:flex flex-col items-center gap-1 px-3">
-              <span className="text-[9px] text-zinc-400 uppercase tracking-wide">EVM Write</span>
+              <span className="text-[9px] text-zinc-400 uppercase tracking-wide">
+                EVM Write
+              </span>
               <div className="flex items-center gap-0.5">
                 <div className="w-12 h-px bg-gradient-to-r from-orange-300/60 to-[#0052ff]/30" />
-                <svg className="w-3 h-3 text-[#0052ff]/40" viewBox="0 0 12 12" fill="currentColor">
+                <svg
+                  className="w-3 h-3 text-[#0052ff]/40"
+                  viewBox="0 0 12 12"
+                  fill="currentColor"
+                >
                   <path d="M6 2l4 4-4 4V6H2V6h4V2z" />
                 </svg>
               </div>
@@ -379,20 +475,32 @@ export default function App() {
               className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-[#0052ff]/[0.03] border border-[#0052ff]/10 min-w-[160px] text-center hover:bg-[#0052ff]/[0.06] transition-colors group"
             >
               <div className="w-8 h-8 rounded-full bg-[#0052ff]/10 flex items-center justify-center overflow-hidden">
-                <img src={LOGOS.base} alt="" className="w-5 h-5 object-contain" />
+                <img
+                  src={LOGOS.base}
+                  alt=""
+                  className="w-5 h-5 object-contain"
+                />
               </div>
               <span className="text-xs font-semibold text-[#0052ff]">Base</span>
               <span className="text-[10px] text-zinc-500">SettlementVault</span>
-              <span className="text-[10px] text-zinc-400 font-mono">Oracle · Exit · Payout</span>
+              <span className="text-[10px] text-zinc-400 font-mono">
+                Oracle · Exit · Payout
+              </span>
               <ExternalLink className="w-2.5 h-2.5 text-[#0052ff]/40 group-hover:text-[#0052ff]/70 transition-colors" />
             </a>
 
             {/* Arrow */}
             <div className="hidden sm:flex flex-col items-center gap-1 px-3">
-              <span className="text-[9px] text-zinc-400 uppercase tracking-wide">Private</span>
+              <span className="text-[9px] text-zinc-400 uppercase tracking-wide">
+                Private
+              </span>
               <div className="flex items-center gap-0.5">
                 <div className="w-12 h-px bg-gradient-to-r from-[#0052ff]/30 to-emerald-300/60" />
-                <svg className="w-3 h-3 text-emerald-400" viewBox="0 0 12 12" fill="currentColor">
+                <svg
+                  className="w-3 h-3 text-emerald-400"
+                  viewBox="0 0 12 12"
+                  fill="currentColor"
+                >
                   <path d="M6 2l4 4-4 4V6H2V6h4V2z" />
                 </svg>
               </div>
@@ -401,20 +509,33 @@ export default function App() {
             {/* Convergence */}
             <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-emerald-50/60 border border-emerald-100 min-w-[160px] text-center">
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="w-4 h-4 text-emerald-600"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <span className="text-xs font-semibold text-emerald-700">Convergence</span>
+              <span className="text-xs font-semibold text-emerald-700">
+                Convergence
+              </span>
               <span className="text-[10px] text-zinc-500">Private Vault</span>
-              <span className="text-[10px] text-zinc-400 font-mono">Shielded payout</span>
+              <span className="text-[10px] text-zinc-400 font-mono">
+                Shielded payout
+              </span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <footer className="text-center pb-6 text-xs text-zinc-400 space-y-1">
-          <p>Event Horizon — Prediction Market Derivative Settlement Infrastructure</p>
+          <p>
+            Event Horizon — Prediction Market Derivative Settlement
+            Infrastructure
+          </p>
           <p>Built with CRE (Chainlink Runtime Environment) · Team Cyph</p>
         </footer>
       </main>

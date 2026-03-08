@@ -10,6 +10,16 @@ export function useEventWatcher() {
 
   useEffect(() => {
     let unwatch: (() => void) | undefined;
+    let invalidateTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleInvalidate = () => {
+      if (invalidateTimer) return;
+      invalidateTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['settlementValue'] });
+        queryClient.invalidateQueries({ queryKey: ['events'] });
+        queryClient.invalidateQueries({ queryKey: ['position'] });
+        invalidateTimer = undefined;
+      }, 1000);
+    };
 
     try {
       unwatch = baseClient.watchEvent({
@@ -20,18 +30,22 @@ export function useEventWatcher() {
           ),
           parseAbiItem(
             'event EarlyExitExecuted(address indexed user, uint256 indexed tokenId, uint256 payout)'
+          ),
+          parseAbiItem(
+            'event FinalSettlement(address indexed user, uint256 indexed tokenId, uint8 outcome, uint256 poolPayout)'
           )
         ],
-        onLogs: () => {
-          queryClient.invalidateQueries({ queryKey: ['settlementValue'] });
-          queryClient.invalidateQueries({ queryKey: ['events'] });
-          queryClient.invalidateQueries({ queryKey: ['position'] });
+        onLogs: (logs) => {
+          if (logs.length > 0) scheduleInvalidate();
         }
       });
     } catch (err) {
       console.warn('Event watcher failed to start:', err);
     }
 
-    return () => unwatch?.();
+    return () => {
+      unwatch?.();
+      if (invalidateTimer) clearTimeout(invalidateTimer);
+    };
   }, [queryClient]);
 }

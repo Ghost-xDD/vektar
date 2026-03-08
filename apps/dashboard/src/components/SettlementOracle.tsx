@@ -29,6 +29,7 @@ export function SettlementOracle({
     spotPrice > 0 && perShareUSDC > 0
       ? ((spotPrice - perShareUSDC) / spotPrice) * 100
       : null;
+  const showLiveComparison = isActive && !isStale;
 
   return (
     <div className="space-y-4">
@@ -65,7 +66,9 @@ export function SettlementOracle({
           <p className="text-2xl font-semibold font-mono text-zinc-900 tabular-nums">
             {isActive ? `$${perShareUSDC.toFixed(4)}` : '—'}
           </p>
-          <p className="text-[11px] text-zinc-500 mt-1">USDC · oracle VWAP</p>
+          <p className="text-[11px] text-zinc-500 mt-1">
+            {isStale ? 'USDC · stale snapshot' : 'USDC · oracle VWAP'}
+          </p>
         </div>
 
         <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
@@ -106,17 +109,21 @@ export function SettlementOracle({
             <p className="text-[11px] text-zinc-400 uppercase tracking-wide">Liquidity discount</p>
           </div>
           <p
-            className={`text-base font-semibold font-mono ${
-              liquidityDiscount !== null && liquidityDiscount > 5
+            className={`font-semibold font-mono ${
+              showLiveComparison && liquidityDiscount !== null && liquidityDiscount > 5
                 ? 'text-red-600'
                 : 'text-zinc-800'
             }`}
           >
-            {liquidityDiscount !== null
+            {showLiveComparison && liquidityDiscount !== null
               ? `${liquidityDiscount.toFixed(1)}% below`
-              : '—'}
+              : isStale
+                ? 'stale'
+                : '—'}
           </p>
-          <p className="text-[10px] text-zinc-400">oracle vs spot</p>
+          <p className="text-[10px] text-zinc-400">
+            {isStale ? 'waiting for fresh oracle write' : 'oracle vs spot'}
+          </p>
         </div>
       </div>
 
@@ -133,9 +140,9 @@ export function SettlementOracle({
 
       {/* Explanation */}
       <p className="text-[11px] text-zinc-400 leading-relaxed border-t border-zinc-100 pt-3">
-        The gap between spot and oracle is the liquidity illusion. CRE computes VWAP
-        against real Polymarket bid depth — if liquidity drains, the oracle collapses
-        while spot stays flat.
+        {isStale
+          ? 'Oracle is stale: this value is from the last on-chain update and may come from a previous scenario. Run a fresh oracle write to compare spot vs oracle for the current mode.'
+          : 'The gap between spot and oracle is the liquidity illusion. CRE computes VWAP against real Polymarket bid depth — if liquidity drains, the oracle collapses while spot stays flat.'}
       </p>
     </div>
   );

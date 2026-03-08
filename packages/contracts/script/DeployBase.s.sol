@@ -39,11 +39,21 @@ contract DeployBase is Script {
             console2.log("USDC_ADDRESS not set, using Base mainnet USDC");
         }
         console2.log("USDC:", usdc);
+
+        uint256 oracleCapBps;
+        try vm.envUint("MAX_VALUE_INCREASE_PER_UPDATE_BPS") returns (uint256 bps) {
+            oracleCapBps = bps;
+        } catch {
+            oracleCapBps = 200; // 2% default anti-spoofing cap
+            console2.log("MAX_VALUE_INCREASE_PER_UPDATE_BPS not set, using default 200");
+        }
+        require(oracleCapBps <= 10000, "MAX_VALUE_INCREASE_PER_UPDATE_BPS > 10000");
+        console2.log("Oracle upward cap (bps):", oracleCapBps);
         console2.log("");
 
         vm.startBroadcast(deployerPrivateKey);
 
-        SettlementVault vault = new SettlementVault(creForwarder, usdc);
+        SettlementVault vault = new SettlementVault(creForwarder, usdc, oracleCapBps);
 
         vm.stopBroadcast();
 
@@ -53,6 +63,7 @@ contract DeployBase is Script {
         console2.log("SettlementVault:", address(vault));
         console2.log("CRE_FORWARDER:  ", vault.CRE_FORWARDER());
         console2.log("USDC:           ", vault.USDC());
+        console2.log("ORACLE_CAP_BPS: ", vault.maxValueIncreasePerUpdateBps());
         console2.log("");
         console2.log("Next Steps:");
         console2.log("1. Update config.json: base.vaultAddress =", address(vault));

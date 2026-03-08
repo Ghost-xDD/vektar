@@ -1,6 +1,6 @@
 #!/bin/bash
-# Deploy all contracts in DEMO MODE (instant LTV updates)
-# MAX_LTV_INCREASE_PER_UPDATE = 10000 (100%)
+# Deploy all contracts in DEMO MODE (instant oracle upward recovery)
+# MAX_VALUE_INCREASE_PER_UPDATE_BPS = 10000 (100%)
 
 set -e
 
@@ -11,9 +11,9 @@ echo "🎬 DEMO MODE DEPLOYMENT"
 echo "=========================================="
 echo ""
 echo "This deploys contracts optimized for video demos:"
-echo "  - MAX_LTV_INCREASE_PER_UPDATE: 10000 bps (100%, instant)"
+echo "  - MAX_VALUE_INCREASE_PER_UPDATE_BPS: 10000 bps (100%, instant)"
 echo "  - Collateral Escrow on Polygon Amoy"
-echo "  - Horizon Vault on Base Sepolia"
+echo "  - SettlementVault on Base Sepolia"
 echo ""
 read -p "Continue? (y/n) " -n 1 -r
 echo
@@ -59,16 +59,16 @@ ESCROW_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "CollateralEsc
 echo "✅ CollateralEscrow: $ESCROW_ADDRESS"
 
 echo ""
-echo "Step 2: Deploy Horizon Vault (Base Sepolia) - DEMO MODE"
+echo "Step 2: Deploy SettlementVault (Base Sepolia) - DEMO MODE"
 echo "========================================================"
-echo "Using MAX_LTV_INCREASE_PER_UPDATE=10000 (100%)"
+echo "Using MAX_VALUE_INCREASE_PER_UPDATE_BPS=10000 (100%)"
 echo ""
 
 # Get deployer address (will be used as temporary forwarder)
 DEPLOYER_ADDRESS=$(cast wallet address "$PRIVATE_KEY")
 echo "Deployer (temp forwarder): $DEPLOYER_ADDRESS"
 
-export MAX_LTV_INCREASE_PER_UPDATE=10000
+export MAX_VALUE_INCREASE_PER_UPDATE_BPS=10000
 export CRE_FORWARDER_ADDRESS=$DEPLOYER_ADDRESS
 
 forge script script/DeployBase.s.sol \
@@ -85,8 +85,8 @@ if [ -z "$BASE_LOG" ]; then
     exit 1
 fi
 
-VAULT_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "HorizonVault") | .contractAddress' "$BASE_LOG")
-echo "✅ HorizonVault: $VAULT_ADDRESS"
+VAULT_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "SettlementVault") | .contractAddress' "$BASE_LOG")
+echo "✅ SettlementVault: $VAULT_ADDRESS"
 
 echo ""
 echo "=========================================="
@@ -98,8 +98,8 @@ echo "  Polygon Amoy:"
 echo "    CollateralEscrow: $ESCROW_ADDRESS"
 echo ""
 echo "  Base Sepolia:"
-echo "    HorizonVault: $VAULT_ADDRESS"
-echo "    MAX_LTV_INCREASE: 10000 bps (100%, instant updates)"
+echo "    SettlementVault: $VAULT_ADDRESS"
+echo "    ORACLE_CAP_BPS: 10000 (100%, instant updates)"
 echo ""
 echo "🔗 Block Explorers:"
 echo "  Polygon: https://amoy.polygonscan.com/address/$ESCROW_ADDRESS"
@@ -125,7 +125,7 @@ cat > .latest-deployment.json <<EOF
   "base": {
     "chainId": 84532,
     "vaultAddress": "$VAULT_ADDRESS",
-    "maxLtvIncrease": 10000,
+    "maxValueIncreasePerUpdateBps": 10000,
     "explorer": "https://sepolia.basescan.org/address/$VAULT_ADDRESS"
   },
   "deployer": "$DEPLOYER_ADDRESS"

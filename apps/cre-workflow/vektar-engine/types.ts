@@ -58,6 +58,7 @@ const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Et
 // Demo configuration (optional)
 const demoConfigSchema = z.object({
   scenario: z.enum(["normal", "thin", "crisis"]).optional(),
+  collateralFallbackShares: z.number().int().positive().optional(),
 }).optional();
 
 // Main workflow configuration schema

@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-02-18T00:00:00Z",
+  "timestamp": "2026-03-07T03:18:00Z",
   "deployer": "0x311e26702ABa231c321C633d1ff6ecB4445f2308",
   "polygon": {
-    "network": "amoy",
-    "mockCTFAddress": "0x3A7c96FE883cCF4a47cB2f125C6F932C3bf030aE",
-    "escrowAddress": "0x3C7F985311E143dCe388368c0657F1CE47422Cb3"
+    "network": "tenderly-vnet",
+    "mockCTFAddress": "0xa281e6a50006bd377a9a0601aab76dfbc9d6d0e7",
+    "escrowAddress": "0x0C90470bFf685eFEDc03Ffff5ACBfFebb0D0cd03"
   },
   "base": {
-    "network": "sepolia",
-    "vaultAddress": "0x1b8c4B38C49Cce06B080b9fB0a77Fb0d7634112A",
-    "maxLtvIncrease": 10000
+    "network": "tenderly-vnet",
+    "vaultAddress": "0xd09076696fb2a097c315c4de816bdafc3a893edc",
+    "maxValueIncreasePerUpdateBps": 10000
   },
   "market": {
     "tokenId": "56078938060096976448086754249497300447360333783952000147427828224794011030104",

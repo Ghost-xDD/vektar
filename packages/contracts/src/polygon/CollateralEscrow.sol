@@ -134,7 +134,11 @@ contract CollateralEscrow is IERC1155Receiver {
 
     function _releaseOnSettlement(address user, uint256 tokenId, uint8 outcome) internal {
         uint256 amount = lockedBalance[user][tokenId];
-        if (amount == 0) return; // No collateral to release
+        if (amount == 0) {
+            // Emit even when no collateral is locked so indexers/UI can track settlement attempts.
+            emit CollateralReleasedOnSettlement(user, tokenId, 0, outcome);
+            return;
+        }
         
         lockedBalance[user][tokenId] = 0;
         totalLockedPerToken[tokenId] -= amount;

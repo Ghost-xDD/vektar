@@ -33899,7 +33899,8 @@ var marketConfigSchema = exports_external2.object({
 });
 var addressSchema = exports_external2.string().regex(/^0x[a-fA-F0-9]{40}$/u, "Must be valid Ethereum address");
 var demoConfigSchema = exports_external2.object({
-  scenario: exports_external2.enum(["normal", "thin", "crisis"]).optional()
+  scenario: exports_external2.enum(["normal", "thin", "crisis"]).optional(),
+  collateralFallbackShares: exports_external2.number().int().positive().optional()
 }).optional();
 var configSchema = exports_external2.object({
   polygon: polygonConfigSchema,
@@ -34219,6 +34220,8 @@ var fetchMergedOrderBook = (runtime2, yesTokenId, noTokenId) => {
 };
 var monitorLiquidity = async (runtime2) => {
   try {
+    const demoFallbackShares = runtime2.config.demo?.collateralFallbackShares ?? 20000;
+    const demoFallbackCollateralWei = BigInt(demoFallbackShares) * 10n ** 18n;
     runtime2.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     runtime2.log("[TRIGGER] Cron fired: */12 * * * * *");
     runtime2.log("[ORACLE]  Settlement oracle cycle started");
@@ -34230,6 +34233,7 @@ var monitorLiquidity = async (runtime2) => {
     }
     runtime2.log(`[ORACLE] Processing ${markets.length} market(s)`);
     for (const market of markets) {
+      const scenario = runtime2.config.demo?.scenario ?? "normal";
       const shortToken = market.tokenId.substring(0, 20) + "...";
       runtime2.log(`[ORACLE] Market: ${shortToken}`);
       runtime2.log(`[HTTP]   Fetching Polymarket order book (via Confidential HTTP — token_id hidden)...`);
@@ -34245,8 +34249,8 @@ var monitorLiquidity = async (runtime2) => {
       runtime2.log(`[EVM READ] Polygon → getTotalLocked() for market...`);
       let totalLocked = getTotalLockedCollateral(runtime2, market.tokenId);
       if (totalLocked <= 0n) {
-        runtime2.log(`[ORACLE] No locked collateral for ${shortToken}, using 1e18 for demo`);
-        totalLocked = 1000000000000000000n;
+        runtime2.log(`[ORACLE] No locked collateral for ${shortToken}; using demo fallback of ${demoFallbackShares.toLocaleString()} shares in ${scenario} mode`);
+        totalLocked = demoFallbackCollateralWei;
       }
       const ltvResult = calculateLiquidityAdjustedLTV({ bids: orderBook.bids }, totalLocked, market.spotPrice, {
         baseLTV: runtime2.config.ltv.baseLTV,
