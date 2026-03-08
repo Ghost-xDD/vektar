@@ -115,10 +115,12 @@ UMA CTF Adapter   ──log──▶ Handler 2          ──write──▶ set
 
 | Contract | Chain | Address |
 |---|---|---|
-| `CollateralEscrow.sol` | Polygon (Tenderly mainnet fork) | `0x194E19AF9bfe69aDA8de9df3eAfAebbe60d0bC74` |
-| `SettlementVault.sol` | Base (Tenderly mainnet fork) | `0x287c88c8c9245daa6a220fef38054fcd174e65c8` |
+| `CollateralEscrow.sol` | Polygon (Tenderly VNet) | `0x0C90470bFf685eFEDc03Ffff5ACBfFebb0D0cd03` |
+| `SettlementVault.sol` | Base (Tenderly VNet) | `0xd09076696fb2a097c315c4de816bdafc3a893edc` |
 | `DemoCompliantPrivateTokenVault` | Ethereum Sepolia | `0xE588a6c73933BFD66Af9b4A07d48bcE59c0D2d13` |
-| CRE Forwarder (mock) | Base fork | `0x5e342a8438b4f5d39e72875fcee6f76b39cce548` |
+| CRE Forwarder (mock) | Base VNet | `0x5e342a8438b4f5d39e72875fcee6f76b39cce548` |
+
+> Contract addresses are defined in `vektar-engine/config.json` — the CRE workflow reads from there. The cre-workflow `.env` addresses are for scripts and `cast call` only.
 
 ### Key Interfaces
 
