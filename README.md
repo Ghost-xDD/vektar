@@ -26,9 +26,9 @@ getSettlementValue(tokenId) → ???      ✗  (nobody)  ← Vektar builds this
 
 $20B+ sits in prediction markets. Protocols want to build on top — lending, leverage, options. Users want to exit before binary resolution. Both hit the same wall: **there is no on-chain source for what a prediction market position can actually be settled for.** Not what it's priced at. What it clears for, right now, against real order book depth.
 
-Every 12 seconds, a CRE workflow fetches the live Polymarket order book via Confidential HTTP with BFT consensus, simulates real exit cost via VWAP, and publishes a cryptographically-signed settlement value on-chain. The fetch is TEE-shielded — no DON node sees which market is being priced. Any protocol calls `getSettlementValue(tokenId)` — a public oracle, like Chainlink price feeds but for prediction market exit liquidity.
+Every 12 seconds, a CRE workflow fetches the live Polymarket order book via **Confidential HTTP with BFT consensus**, simulates real exit cost via VWAP, and publishes a cryptographically-signed settlement value on-chain. The fetch is TEE-shielded — no DON node sees which market is being priced. Any protocol calls `getSettlementValue(tokenId)` — a public oracle, like Chainlink price feeds but for prediction market exit liquidity.
 
-**To prove the oracle works, we built a demo app on top of it: early exit.** Users call `earlyExit()` and receive the oracle's settlement value in USDC immediately, with payouts routed through a Convergence privacy vault — recipient, amount, and operator identity never appear on-chain. 
+**To prove the oracle works, we built a demo app on top of it: early exit.** Users call `earlyExit()` and receive the oracle's settlement value in USDC immediately, with payouts routed through a **Convergence privacy vault** — recipient, amount, and operator identity never appear on-chain. 
 
 The oracle is the product. Early exit is one thing you can build with it.
 
