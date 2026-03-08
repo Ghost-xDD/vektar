@@ -6,6 +6,8 @@ const BASE_EXPLORER =
   'https://dashboard.tenderly.co/explorer/vnet/2e625465-6c0e-4577-b01f-790eb8000996';
 const POLYGON_EXPLORER =
   'https://dashboard.tenderly.co/explorer/vnet/4ad68571-6a73-406b-ad62-a169a4593612';
+const POLYMARKET_MARKET_TITLE = 'What price will Bitcoin hit in 2026?';
+const POLYMARKET_TARGET_OUTCOME = '↑ 100,000';
 import { useSettlementValue } from './hooks/useSettlementValue';
 import { usePosition } from './hooks/usePosition';
 import { useOrderBook, type OrderBookLevel } from './hooks/useOrderBook';
@@ -60,6 +62,11 @@ export default function App() {
           ? `$${volume.toLocaleString()}`
           : '—';
   const normalizedWallet = wallet.address?.toLowerCase();
+  const hasShares = (position?.shares ?? 0) > 0;
+  const registeredShieldedAddress =
+    position?.shieldedAddress && position.shieldedAddress !== ZERO_ADDR
+      ? position.shieldedAddress
+      : null;
   const isFinallySettled =
     !!normalizedWallet &&
     events.some(
@@ -160,11 +167,11 @@ export default function App() {
 
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Market header */}
-        <div className="rounded-2xl border border-zinc-200 bg-white/70 backdrop-blur-sm p-5 shadow-sm">
+        <div className="rounded-2xl border-2 border-orange-200 bg-white/90 backdrop-blur-sm p-6 shadow-md">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-orange-700 bg-orange-100 px-2.5 py-1 rounded-full border border-orange-200">
                   <img
                     src={LOGOS.polymarket}
                     alt=""
@@ -172,13 +179,23 @@ export default function App() {
                   />
                   Polymarket
                 </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-zinc-900 text-white">
+                  Official Market
+                </span>
                 <span className="text-[10px] text-zinc-400">
                   {volumeLabel} Vol.
                 </span>
               </div>
-              <h2 className="text-lg font-semibold text-zinc-900 leading-snug">
-                Will Bitcoin reach $100,000 by Dec 31, 2026?
+              <h2 className="text-2xl sm:text-[1.7rem] font-extrabold text-zinc-950 leading-tight tracking-tight">
+                {POLYMARKET_MARKET_TITLE}
               </h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Tracking outcome{' '}
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-900 text-white font-bold">
+                  {POLYMARKET_TARGET_OUTCOME}
+                </span>{' '}
+                for this market.
+              </p>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-400">
                 <span>
                   Spot:{' '}
@@ -311,7 +328,7 @@ export default function App() {
               isOracleActive={settlement?.isActive ?? false}
               isOracleStale={settlement?.isStale ?? false}
               isSettled={position?.settled ?? false}
-              hasShares={(position?.shares ?? 0) > 0}
+              hasShares={hasShares}
               isConnected={!!wallet.address}
               isCorrectChain={wallet.isCorrectChain}
               onExecute={earlyExit.execute}
@@ -333,17 +350,16 @@ export default function App() {
               shieldedAddress={shieldedAddr.shieldedAddress}
               generateState={shieldedAddr.state}
               generateError={shieldedAddr.error}
-              registeredAddress={
-                position?.shieldedAddress !== ZERO_ADDR
-                  ? position?.shieldedAddress
-                  : null
-              }
+              registeredAddress={registeredShieldedAddress}
+              hasShares={hasShares}
               registerState={registerPosition.state}
               registerError={registerPosition.error}
               onGenerate={shieldedAddr.generate}
               onRegister={() =>
                 registerPosition.register(
-                  shieldedAddr.shieldedAddress ?? undefined,
+                  shieldedAddr.shieldedAddress ??
+                    registeredShieldedAddress ??
+                    undefined,
                 )
               }
             />

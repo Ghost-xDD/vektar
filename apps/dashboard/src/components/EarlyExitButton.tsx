@@ -87,6 +87,20 @@ export function EarlyExitButton({
     );
   }
 
+  if (!hasShares && state === 'idle') {
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 space-y-2">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-zinc-500 shrink-0" />
+          <p className="text-sm font-medium text-zinc-700">No shares to exit</p>
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          Register your position first to enable early exit.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {/* Idle state: main exit button */}

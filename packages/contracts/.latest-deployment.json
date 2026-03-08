@@ -4,7 +4,7 @@
   "polygon": {
     "network": "tenderly-vnet",
     "mockCTFAddress": "0xa281e6a50006bd377a9a0601aab76dfbc9d6d0e7",
-    "escrowAddress": "0x4e4a57aae1c5bbb81a428376a997cb6011844166"
+    "escrowAddress": "0x0C90470bFf685eFEDc03Ffff5ACBfFebb0D0cd03"
   },
   "base": {
     "network": "tenderly-vnet",

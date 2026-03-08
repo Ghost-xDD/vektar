@@ -8,6 +8,7 @@ interface ShieldedAddressCardProps {
   generateState: GenerateState;
   generateError: string | null;
   registeredAddress?: `0x${string}` | null;
+  hasShares: boolean;
   registerState: RegisterState;
   registerError?: string | null;
   onGenerate: () => void;
@@ -23,6 +24,7 @@ export function ShieldedAddressCard({
   generateState,
   generateError,
   registeredAddress,
+  hasShares,
   registerState,
   registerError,
   onGenerate,
@@ -42,6 +44,10 @@ export function ShieldedAddressCard({
     generateState === 'switching-back' ||
     generateState === 'fetching';
   const isRegistering = registerState === 'pending';
+  const hasRegisteredAddress =
+    !!registeredAddress &&
+    registeredAddress !== '0x0000000000000000000000000000000000000000';
+  const showRegisterPositionCta = hasRegisteredAddress && !hasShares;
 
   const generateLabel =
     generateState === 'switching-sepolia'
@@ -118,6 +124,24 @@ export function ShieldedAddressCard({
               <span>{generateError}</span>
             </div>
           )}
+
+          {showRegisterPositionCta &&
+            (registerState === 'done' ? (
+              <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-green-200 bg-green-50 text-sm font-medium text-green-700">
+                <Check className="w-4 h-4" />
+                Position registered on-chain
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onRegister}
+                disabled={isRegistering}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium text-orange-700 transition-colors"
+              >
+                {isRegistering && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isRegistering ? 'Registering position…' : 'Register Position'}
+              </button>
+            ))}
         </div>
       ) : (
         <div className="space-y-3">
@@ -173,7 +197,7 @@ export function ShieldedAddressCard({
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium text-orange-700 transition-colors"
             >
               {isRegistering && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isRegistering ? 'Registering…' : 'Register'}
+              {isRegistering ? 'Registering position…' : 'Register Position'}
             </button>
           )}
 

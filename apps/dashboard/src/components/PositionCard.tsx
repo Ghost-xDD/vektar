@@ -70,7 +70,7 @@ export function PositionCard({
       <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 space-y-2">
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-zinc-500">Market</span>
-          <span className="font-medium text-zinc-800">BTC $100k YES</span>
+          <span className="font-medium text-zinc-800">Polymarket ↑ 100,000</span>
         </div>
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-zinc-500">{showExitedState ? 'Shares redeemed' : 'Shares locked'}</span>
