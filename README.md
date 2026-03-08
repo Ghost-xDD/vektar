@@ -37,6 +37,8 @@ The oracle is the product. Early exit is one thing you can build with it.
 - [What This Enables](#what-this-enables)
 - [Files Using Chainlink CRE](#files-using-chainlink-cre)
 - [Comparison](#comparison)
+- [End-to-End Demo Flow](#end-to-end-demo-flow)
+- [Challenges](#challenges)
 - [Quick Start](#quick-start)
 - [Repo](#repo)
 
@@ -312,40 +314,137 @@ Config files (no SDK calls): [`workflow.yaml`](apps/cre-workflow/vektar-engine/w
 
 ---
 
+## End-to-End Demo Flow
+
+A full walkthrough that runs all three CRE handlers against Tenderly Virtual TestNets. Prerequisites: `bun install`, CRE CLI, Foundry, and `apps/cre-workflow/.env` configured (see [Quick Start](#quick-start)).
+
+### 1. Settlement Oracle (Handler 1)
+
+Run one oracle cycle with live Polymarket order book data:
+
+```bash
+cd apps/cre-workflow
+./run-normal.sh
+# Expected: [TX] ✓ 0x... updateSettlementValue accepted
+```
+
+Watch the dashboard — settlement value and activity feed update. Then stress-test the liquidity illusion:
+
+```bash
+./run-thin.sh    # 90% liquidity drain — oracle drops, spot unchanged
+./run-crisis.sh  # 97% drain + price decay — oracle collapses further
+./run-normal.sh  # Recover
+```
+
+### 2. Early Exit + Private Payout (Handler 3)
+
+**Must run before Handler 2** — early exit is for exiting before market resolution. Once Handler 2 (final settlement) runs, the position is closed and early exit is no longer possible.
+
+> **Demo note:** Handler 3 sends 1 LINK to the shielded address because the Convergence vault is on Sepolia and only supports LINK. That 1 LINK represents the USDC settlement value — see [Challenges](#challenges).
+
+Requires a position registered in the dashboard and an `earlyExit()` tx:
+
+1. **Dashboard:** Register position, generate shielded address, click **Early Exit**
+2. Copy the `EarlyExitExecuted` tx hash from Tenderly
+3. Run Handler 3:
+
+```bash
+cre workflow simulate vektar-engine \
+  --non-interactive --trigger-index 2 \
+  --evm-tx-hash <EARLY_EXIT_TX_HASH> --evm-event-index 1 \
+  --target local-simulation --broadcast
+# Expected: [PRIVATE PAYOUT] ✅ transaction_id: ...
+```
+
+### 3. Final Settlement (Handler 2)
+
+Trigger with a real UMA `QuestionResolved` tx from Polygon mainnet (available on Tenderly forks via mainnet state sync). Settles positions that did *not* early exit when the market resolves:
+
+```bash
+cd apps/cre-workflow
+source .env
+cre workflow simulate vektar-engine \
+  --non-interactive --trigger-index 1 \
+  --evm-tx-hash 0x8ee8b5d99c90758b31aa563c0be36e2082f7902f5ec9a2148859e7fa3eded5ec \
+  --evm-event-index 1 \
+  --target local-simulation --broadcast
+# Expected: settlePosition on Base ✓, releaseOnSettlement on Polygon ✓
+```
+
+### 4. Verify On-Chain
+
+```bash
+source .env
+cast call $SETTLEMENT_VAULT_ADDRESS \
+  "getSettlementValue(uint256)(uint256,uint256)" \
+  56078938060096976448086754249497300447360333783952000147427828224794011030104 \
+  --rpc-url $BASE_TENDERLY_RPC
+# Returns: (valueUSDC, lastUpdated)
+```
+
+### 5. Dashboard
+
+```bash
+cd apps/dashboard && bun dev  # http://localhost:5173
+```
+
+Ensure `apps/dashboard/.env.local` has `VITE_BASE_TENDERLY_RPC`, `VITE_SETTLEMENT_VAULT_ADDRESS`, etc. (see `apps/dashboard/.env.local.backup` for reference).
+
+---
+
+## Challenges
+
+### Private Payout: 1 LINK vs USDC
+
+The Convergence privacy vault used for Handler 3 is deployed on **Ethereum Sepolia** and supports only **LINK** — not USDC. The demo therefore sends **1 LINK** as a symbolic transfer. In production, the user would receive the full oracle settlement value in USDC on Base.
+
+**Mitigation:** The Handler 3 logic is unchanged — it reads the `payout` from the `EarlyExitExecuted` event (the oracle settlement value in USDC 6 decimals). The only demo-specific part is the transfer amount sent to the Convergence API. In production, we would either:
+- Deploy the Convergence vault on Base with USDC support and use the same `payout` value directly, or
+- Scale the transfer amount via a LINK/USD price feed so the recipient receives LINK-equivalent value.
+
+The 1 LINK in the demo is a placeholder representing the USDC value the user is entitled to — the privacy architecture (shielded address, BFT consensus, ACE compliance) is unchanged.
+
+---
+
 ## Quick Start
 
 **Prerequisites:** [Bun](https://bun.sh/) v1.2+, [Foundry](https://getfoundry.sh/), [CRE CLI](https://docs.chain.link/cre/getting-started/cli-installation)
 
 ```bash
 bun install
-cp env.template apps/cre-workflow/.env  # add Tenderly fork RPCs + contract addresses
+cd apps/cre-workflow && cp env.template .env
+# Edit .env: add Tenderly fork RPCs, CRE_ETH_PRIVATE_KEY, contract addresses
 ```
 
 **Handler 1** — settlement oracle:
 
 ```bash
 cd apps/cre-workflow
-cre workflow simulate vektar-engine --non-interactive --trigger-index 0
-# Expected: [TX] 0xfa30f6... ✓  updateSettlementValue accepted
+./run-normal.sh
+# Or: cre workflow simulate vektar-engine --non-interactive --trigger-index 0 --target local-simulation --broadcast
 ```
 
-**Handler 2** — final settlement (UMA event):
+**Handler 3** — private payout (run before Handler 2; requires `earlyExit()` tx hash from dashboard):
+
+```bash
+cd apps/cre-workflow
+source .env
+cre workflow simulate vektar-engine \
+  --non-interactive --trigger-index 2 \
+  --evm-tx-hash <TX_FROM_EARLY_EXIT> --evm-event-index 1 \
+  --target local-simulation --broadcast
+# Expected: [PRIVATE PAYOUT] ✅ transaction_id: ...
+```
+
+**Handler 2** — final settlement (UMA event; for positions that did not early exit):
 
 ```bash
 cre workflow simulate vektar-engine \
   --non-interactive --trigger-index 1 \
-  --evm-tx-hash 0x8ee8b5de01a44a65b793eadc0be5a3e1a6d4a0b7d95cca29eb96e1aadc30e4dc \
-  --evm-event-index 0
+  --evm-tx-hash 0x8ee8b5d99c90758b31aa563c0be36e2082f7902f5ec9a2148859e7fa3eded5ec \
+  --evm-event-index 1 \
+  --target local-simulation --broadcast
 # Expected: settlePosition on Base ✓, releaseOnSettlement on Polygon ✓
-```
-
-**Handler 3** — private payout:
-
-```bash
-cre workflow simulate vektar-engine \
-  --non-interactive --trigger-index 2 \
-  --evm-tx-hash <TX_FROM_EARLY_EXIT> --evm-event-index 1
-# Expected: [PRIVATE PAYOUT] ✅ transaction_id: 019cc054-...
 ```
 
 **Dashboard:**
@@ -357,7 +456,8 @@ cd apps/dashboard && bun dev  # localhost:5173
 **Check oracle value on-chain:**
 
 ```bash
-cast call 0x287c88c8c9245daa6a220fef38054fcd174e65c8 \
+cd apps/cre-workflow && source .env
+cast call $SETTLEMENT_VAULT_ADDRESS \
   "getSettlementValue(uint256)(uint256,uint256)" \
   56078938060096976448086754249497300447360333783952000147427828224794011030104 \
   --rpc-url $BASE_TENDERLY_RPC
