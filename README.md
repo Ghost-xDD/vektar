@@ -37,7 +37,6 @@ The oracle is the product. Early exit is one thing you can build with it.
 - [What This Enables](#what-this-enables)
 - [Files Using Chainlink CRE](#files-using-chainlink-cre)
 - [Comparison](#comparison)
-- [End-to-End Demo Flow](#end-to-end-demo-flow)
 - [Challenges](#challenges)
 - [Quick Start](#quick-start)
 - [Repo](#repo)
@@ -315,84 +314,6 @@ Config files (no SDK calls): [`workflow.yaml`](apps/cre-workflow/vektar-engine/w
 
 ---
 
-## End-to-End Demo Flow
-
-A full walkthrough that runs all three CRE handlers against Tenderly Virtual TestNets. Prerequisites: `bun install`, CRE CLI, Foundry, and `apps/cre-workflow/.env` configured (see [Quick Start](#quick-start)).
-
-### 1. Settlement Oracle (Handler 1)
-
-Run one oracle cycle with live Polymarket order book data:
-
-```bash
-cd apps/cre-workflow
-./run-normal.sh
-# Expected: [TX] ✓ 0x... updateSettlementValue accepted
-```
-
-Watch the dashboard — settlement value and activity feed update. Then stress-test the liquidity illusion:
-
-```bash
-./run-thin.sh    # 90% liquidity drain — oracle drops, spot unchanged
-./run-crisis.sh  # 97% drain + price decay — oracle collapses further
-./run-normal.sh  # Recover
-```
-
-### 2. Early Exit + Private Payout (Handler 3)
-
-**Must run before Handler 2** — early exit is for exiting before market resolution. Once Handler 2 (final settlement) runs, the position is closed and early exit is no longer possible.
-
-> **Demo note:** Handler 3 sends 1 LINK to the shielded address because the Convergence vault is on Sepolia and only supports LINK. That 1 LINK represents the USDC settlement value — see [Challenges](#challenges).
-
-Requires a position registered in the dashboard and an `earlyExit()` tx:
-
-1. **Dashboard:** Register position, generate shielded address, click **Early Exit**
-2. Copy the `EarlyExitExecuted` tx hash from Tenderly
-3. Run Handler 3:
-
-```bash
-cre workflow simulate vektar-engine \
-  --non-interactive --trigger-index 2 \
-  --evm-tx-hash <EARLY_EXIT_TX_HASH> --evm-event-index 1 \
-  --target local-simulation --broadcast
-# Expected: [PRIVATE PAYOUT] ✅ transaction_id: ...
-```
-
-### 3. Final Settlement (Handler 2)
-
-Trigger with a real UMA `QuestionResolved` tx from Polygon mainnet (available on Tenderly forks via mainnet state sync). Settles positions that did *not* early exit when the market resolves:
-
-```bash
-cd apps/cre-workflow
-source .env
-cre workflow simulate vektar-engine \
-  --non-interactive --trigger-index 1 \
-  --evm-tx-hash 0x8ee8b5d99c90758b31aa563c0be36e2082f7902f5ec9a2148859e7fa3eded5ec \
-  --evm-event-index 1 \
-  --target local-simulation --broadcast
-# Expected: settlePosition on Base ✓, releaseOnSettlement on Polygon ✓
-```
-
-### 4. Verify On-Chain
-
-```bash
-source .env
-cast call $SETTLEMENT_VAULT_ADDRESS \
-  "getSettlementValue(uint256)(uint256,uint256)" \
-  56078938060096976448086754249497300447360333783952000147427828224794011030104 \
-  --rpc-url $BASE_TENDERLY_RPC
-# Returns: (valueUSDC, lastUpdated)
-```
-
-### 5. Dashboard
-
-```bash
-cd apps/dashboard && bun dev  # http://localhost:5173
-```
-
-Ensure `apps/dashboard/.env.local` has `VITE_BASE_TENDERLY_RPC`, `VITE_SETTLEMENT_VAULT_ADDRESS`, etc. (see `apps/dashboard/.env.local.backup` for reference).
-
----
-
 ## Challenges
 
 ### Private Payout: 1 LINK vs USDC
@@ -411,57 +332,64 @@ The 1 LINK in the demo is a placeholder representing the USDC value the user is 
 
 **Prerequisites:** [Bun](https://bun.sh/) v1.2+, [Foundry](https://getfoundry.sh/), [CRE CLI](https://docs.chain.link/cre/getting-started/cli-installation)
 
+### Setup
+
 ```bash
 bun install
 cd apps/cre-workflow && cp env.template .env
-# Edit .env: add Tenderly fork RPCs, CRE_ETH_PRIVATE_KEY, contract addresses
+# Edit .env: Tenderly RPCs, CRE_ETH_PRIVATE_KEY, VAULT_OPERATOR_KEY (see setup-private-vault.sh)
 ```
 
-**Handler 1** — settlement oracle:
+Ensure `apps/dashboard/.env.local` has `VITE_BASE_TENDERLY_RPC`, `VITE_SETTLEMENT_VAULT_ADDRESS`, `VITE_ESCROW_ADDRESS`, etc. (see `apps/dashboard/.env.local.backup`).
+
+### Run the demo
+
+**1. Settlement oracle (Handler 1)**
 
 ```bash
 cd apps/cre-workflow
 ./run-normal.sh
-# Or: cre workflow simulate vektar-engine --non-interactive --trigger-index 0 --target local-simulation --broadcast
+# Expected: [TX] ✓ updateSettlementValue accepted
 ```
 
-**Handler 3** — private payout (run before Handler 2; requires `earlyExit()` tx hash from dashboard):
+Optional — stress-test the liquidity illusion: `./run-thin.sh` then `./run-crisis.sh` (oracle drops while spot stays flat), then `./run-normal.sh` to recover.
+
+**2. Early exit + private payout (Handler 3)** — run before Handler 2
+
+Register a position in the dashboard, generate shielded address, click **Early Exit**, then copy the tx hash and run:
 
 ```bash
-cd apps/cre-workflow
 source .env
-cre workflow simulate vektar-engine \
-  --non-interactive --trigger-index 2 \
-  --evm-tx-hash <TX_FROM_EARLY_EXIT> --evm-event-index 1 \
+cre workflow simulate vektar-engine --non-interactive --trigger-index 2 \
+  --evm-tx-hash <EARLY_EXIT_TX_HASH> --evm-event-index 1 \
   --target local-simulation --broadcast
 # Expected: [PRIVATE PAYOUT] ✅ transaction_id: ...
 ```
 
-**Handler 2** — final settlement (UMA event; for positions that did not early exit):
+> Handler 3 sends 1 LINK (Convergence vault on Sepolia supports LINK only) — see [Challenges](#challenges).
+
+**3. Final settlement (Handler 2)** — for positions that did not early exit
 
 ```bash
-cre workflow simulate vektar-engine \
-  --non-interactive --trigger-index 1 \
+cre workflow simulate vektar-engine --non-interactive --trigger-index 1 \
   --evm-tx-hash 0x8ee8b5d99c90758b31aa563c0be36e2082f7902f5ec9a2148859e7fa3eded5ec \
-  --evm-event-index 1 \
-  --target local-simulation --broadcast
+  --evm-event-index 1 --target local-simulation --broadcast
 # Expected: settlePosition on Base ✓, releaseOnSettlement on Polygon ✓
 ```
 
-**Dashboard:**
-
-```bash
-cd apps/dashboard && bun dev  # localhost:5173
-```
-
-**Check oracle value on-chain:**
+**4. Verify on-chain**
 
 ```bash
 cd apps/cre-workflow && source .env
-cast call $SETTLEMENT_VAULT_ADDRESS \
-  "getSettlementValue(uint256)(uint256,uint256)" \
+cast call $SETTLEMENT_VAULT_ADDRESS "getSettlementValue(uint256)(uint256,uint256)" \
   56078938060096976448086754249497300447360333783952000147427828224794011030104 \
   --rpc-url $BASE_TENDERLY_RPC
+```
+
+**5. Dashboard**
+
+```bash
+cd apps/dashboard && bun dev  # localhost:5173
 ```
 
 ---
