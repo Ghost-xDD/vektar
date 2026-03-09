@@ -75,3 +75,4 @@ PITCHDECK.md
 apps/dashboard/.env.local.backup
 apps/cre-workflow/vektar-engine/config.json.backup
 
+apps/dashboard/.env.production
