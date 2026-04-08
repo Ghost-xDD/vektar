@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { baseClient } from '../lib/clients';
 import { vaultAbi } from '../lib/abis';
 
-const VAULT_ADDRESS = import.meta.env.VITE_VAULT_ADDRESS as `0x${string}`;
+const VAULT_ADDRESS = import.meta.env.VITE_SETTLEMENT_VAULT_ADDRESS as `0x${string}`;
 const TOKEN_ID = BigInt(import.meta.env.VITE_TOKEN_ID);
 
 export function useMarketLTV() {
